@@ -23,6 +23,7 @@
 
 ### :rocket: 快速开始
 1. 简洁性
+
 要极速动手体验这个方法，只需简单配置和运行在`run.py`中的以下代码：
 
 ```python
@@ -64,22 +65,25 @@ $$X \approx D R$$
   图 1. 非负矩阵分解演示
 </p>
 
-其中，如果 $X$的大小为 $m \times n$，通常$D$的大小为 $m \times k$ 并且$R$大小为 $k \times n$，其中$k$r 是预先定义的因子数量，并且通常小于$m$和$n$.
+其中，如果 $X$ 的大小为 $m \times n$，通常 $D$ 的大小为 $m \times k$ 并且 $R$ 大小为 $k \times n$，其中 $k$ 是预先定义的因子数量，并且通常小于 $m$ 和 $n$ .
 
 NMF 在许多应用中都很有用，例如特征提取、图像处理和文本挖掘。
 
 我们的实验为比较各种非负矩阵分解变种的稳健型（或鲁棒性）。
+
 <p align="center">
   <img src="figures/pin.png">
   <br>
   Figure 2. 我们的实验演示
 </p>
 
-- 2个数据集： ORL， Cropped YaleB              
-- 非负矩阵分解：基于$L_2$范数（$L_2$ Norm Based）， 基于$L_1$范数（$L_1 Norm Based$）， KL散度（KL Divergence），IS散度（IS Divergence），基于 $L_{2，1}$ 范数（$L_{2，1}$ Norm Based），超表面损失（Hypersurface Cost），（$L_1$ Norm Regularized），基于Capped范数（Capped Norm Based）， Cauchy              
-- 噪声类型：均匀（Uniform）， 高斯（Gaussian），拉普拉斯（Laplacian），块状遮挡（Block Occlusion），椒盐（Salt and Pepper）
+- **2个**数据集： ORL， Cropped YaleB              
+- **9种**非负矩阵分解：基于$L_2$范数（$L_2$ Norm Based）， 基于$L_1$范数（$L_1 Norm Based$）， KL散度（KL Divergence），IS散度（IS Divergence），基于 $L_{2，1}$ 范数（$L_{2，1}$ Norm Based），超表面损失（Hypersurface Cost），（$L_1$ Norm Regularized），基于Capped范数（Capped Norm Based）， Cauchy              
+- **5种**噪声类型：均匀（Uniform）， 高斯（Gaussian），拉普拉斯（Laplacian），块状遮挡（Block Occlusion），椒盐（Salt and Pepper）
 
 ## 2. :sparkles: 非负矩阵分解变体
+**提示**：GitHub本身不支持在Markdown预览中渲染LaTeX数学公式，部分公式可能无法正常显示。请您可以使用其他工具来查看这些公式。
+
 - 基于$L_2$范数（$L_2$ Norm Based）非负矩阵分解
   - 损失函数：      
   $\lVert X - DR \rVert^2 = \sum_{\substack{ijk}}(x_{ij} - d_{ik}r_{kj})^2$
@@ -294,7 +298,7 @@ NMF 在许多应用中都很有用，例如特征提取、图像处理和文本�
 
 - 基于 $L_1$ 范数非负矩阵分解:
 <p align="center">
-  <img src="figures/l1conv.png">
+  <img src="figures/L1conv.png">
   <br>
   图 8. 基于L<sub>1</sub>范数非负矩阵分解的收敛趋势
 </p>
@@ -302,7 +306,7 @@ NMF 在许多应用中都很有用，例如特征提取、图像处理和文本�
 
 - 基于 $L_{2，1}$ 范数非负矩阵分解:
 <p align="center">
-  <img src="figures/l21conv.png">
+  <img src="figures/L21conv.png">
   <br>
   图 9. 基于L<sub>2，1</sub>范数非负矩阵分解的收敛趋势
 </p>
@@ -951,7 +955,9 @@ where $I(\cdot,\cdot$) is the mutual information,$H(\cdot)$ is the entropy.
 ├── .gitignore
 ├── LICENSE
 ├── README.md
+├── README.zh-CN.md
 ├── requirements.txt
+├── run.ipynb
 └── run.py
 ```
 

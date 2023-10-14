@@ -82,6 +82,8 @@ Our experiments seek to compare the robustness of various NMF variants.
 - **5** Noise Types: Uniform, Gaussian, Laplacian, Block Occlusion, Salt and Pepper
 
 ## 2. :sparkles: NMF Variants
+**Note**: GitHub itself does not support rendering LaTeX math formulas in Markdown previews, so some formulas may not display correctly. You might want to use other tools to view these formulas.
+
 - $L_2$ Norm Based NMF
   - Cost Function:
   $\lVert X - DR \rVert^2 = \sum_{\substack{ijk}}(x_{ij} - d_{ik}r_{kj})^2$
@@ -296,7 +298,7 @@ Hope this helps you carry out the experiment smoothly!
 
 - $L_1$ Norm Based NMF:
 <p align="center">
-  <img src="figures/l1conv.png">
+  <img src="figures/L1conv.png">
   <br>
   Figure 8. Convergence Trend of L<sub>1</sub> Norm Based NMF
 </p>
@@ -304,7 +306,7 @@ Hope this helps you carry out the experiment smoothly!
 
 - $L_{2, 1}$ Norm Based NMF:
 <p align="center">
-  <img src="figures/l21conv.png">
+  <img src="figures/L21conv.png">
   <br>
   Figure 9. Convergence Trend of L<sub>2, 1</sub> Norm Based NMF
 </p>
@@ -955,7 +957,9 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
 ├── .gitignore
 ├── LICENSE
 ├── README.md
+├── README.zh-CN.md
 ├── requirements.txt
+├── run.ipynb
 └── run.py
 ```
 
