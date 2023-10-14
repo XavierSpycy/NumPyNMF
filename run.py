@@ -9,5 +9,5 @@ pipeline = Pipeline(nmf='L1NormRegularizedNMF', # Options: 'L2NormNMF', 'L1NormN
                     scaler='MinMax') # Options: 'MinMax', 'Standard'
 
 # Run the pipeline
-pipeline.run(max_iter=500) # Parameters: max_iter: int, convergence_trend: bool, matrix_size: bool, verbose: bool
+pipeline.run(max_iter=500, verbose=True) # Parameters: max_iter: int, convergence_trend: bool, matrix_size: bool, verbose: bool
 pipeline.evaluate(idx=9, imshow=True) # Parameters: idx: int, imshow: bool
