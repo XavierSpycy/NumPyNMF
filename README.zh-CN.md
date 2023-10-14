@@ -1,352 +1,348 @@
-English| [中文版](README.zh-CN.md)
-# Non-negative Matrix Factorization using NumPy
-- [Quick Start](#rocket-quick-start)
-- [1. Introduction](#1-sparkles-introduction)
-- [2. NMF Variants](#2-sparkles-nmf-variants)
-- [3. Noise Types](#3-sparkles-noise-types)
-- [4. Setup and Execution](#4-sparkles-setup-and-execution)
-- [5. Convergence Trends](#5-sparkles-convergence-trends)
-- [6. Results](#6-sparkles-results)
-  - [6.1. Metrics](#61-metrics)
-    - [6.1.1. What are They?](#611-what-are-they)
-    - [6.1.2. Why RMSE More Important?](#612-why-rmse-more-important)
-  - [6.2. Performance on ORL and YaleB Datasets](#62-performance-on-orl-and-yaleb-datasets)
-  - [6.3. Reconstruction Effects](#63-reconstruction-effects)
-- [7. Project Structure](#7-sparkles-project-structure)
+[English](README.md) | 中文版
+# 用NumPy非负矩阵分解
+- [快速开始](#rocket-快速开始)
+- [1. 简介](#1-sparkles-简介)
+- [2. 非负矩阵分解变体](#2-sparkles-非负矩阵分解变体)
+- [3. 噪声类型](#3-sparkles-噪声类型)
+- [4. 设置和执行](#4-sparkles-设置和执行)
+- [5. 收敛趋势](#5-sparkles-收敛趋势)
+- [6. 结果](#6-sparkles-结果)
+  - [6.1. 指标](#61-指标)
+    - [6.1.1. 它们是什么？](#611-它们是什么)
+    - [6.1.2. 为什么均方根误差更重要？](#612-为什么均方根误差更重要)
+  - [6.2. 在ORL和YaleB数据集上的性能](#62-在orl和yaleb数据集上的性能)
+  - [6.3. 重建效果](#63-重建效果)
+- [7. 项目结构](#7-sparkles-项目结构)
 - [8. TODO](#8-todo)
-- [9. Contribution](#9-handshake-contribution)
+- [9. 贡献](#9-handshake-贡献)
 
-:pushpin: **Important Notice**:
-Please ensure that dataset files are placed in the `data` directory before executing `run.py`. For emphasis, we've incorporated an error notification mechanism. Moreover, we've provided comprehensive docstrings and comments within our code. Should you have any questions, feel free to explore our source code in depth.
+:pushpin: **重要提示**：
+请确保在执行`run.py`前数据集文件置于`data`目录下。为了强调，我们已融合错误提示机制。另外，我们已经在代码中提供了全面的文档字符串和注释。如果您有任何疑问，自由地深入探索我们的源代码。
 
-Please refrain from intentionally inputting unexpected data types to test our algorithms. We do not have initial input type assertions, so they cannot reject inappropriate inputs from the start. Thank you for your understanding.
+请勿故意输入非预期的数据类型来测试我们的算法。我们没有进行初步的输入类型检查，因此无法在一开始就拒绝不合适的输入。感谢您的理解！
 
-## :rocket: Quick Start
-1. Simplicity
+### :rocket: 快速开始
+1. 简洁性
+要极速动手体验这个方法，只需简单配置和运行在`run.py`中的以下代码：
 
-To swiftly experience the method in action, simply configure and run the following in `run.py`:
 ```python
 from algorithm.pipeline import Pipeline
 
-pipeline = Pipeline(nmf='L1NormRegularizedNMF', # Options: 'L2NormNMF', 'L1NormNMF', 'KLdivergenceNMF', 'ISdivergenceNMF', 'RobustNMF', 'HypersurfaceNMF', 'L1NormRegularizedNMF', 'CappedNormNMF', 'CauchyNMF'
-                    dataset='ORL', # Options: 'ORL', 'YaleB'
-                    reduce=1, # ORL: 1, YaleB: 3
-                    noise_type='uniform', # Options: 'uniform', 'gaussian', 'laplacian', 'salt_and_pepper', 'block'
-                    noise_level=0.02, # Uniform, Gassian, Laplacian: [.1, .3], Salt and Pepper: [.02, .10], Block: [10, 20]
-                    random_state=3407, # 0, 42, 99, 512, 3407 in our experiments
-                    scaler='MinMax') # Options: 'MinMax', 'Standard'
+pipeline = Pipeline(nmf='L1NormRegularizedNMF',# Options: 'L2NormNMF','L1NormNMF','KLdivergenceNMF','ISdivergenceNMF','RobustNMF','HypersurfaceNMF','L1NormRegularizedNMF','CappedNormNMF','CauchyNMF'
+                    dataset='ORL',# Options: 'ORL','YaleB'
+                    reduce=1,# ORL: 1,YaleB: 3
+                    noise_type='uniform',# Options: 'uniform','gaussian','laplacian','salt_and_pepper','block'
+                    noise_level=0.02,# Uniform,Gassian,Laplacian: [.1,.3],Salt and Pepper: [.02,.10],Block: [10,20]
+                    random_state=3407,# 0,42,99,512,3407 in our experiments
+                    scaler='MinMax') # Options: 'MinMax','Standard'
 
 # Run the pipeline
-pipeline.run() # Parameters: max_iter: int, convergence_trend: bool, matrix_size: bool
-pipeline.evaluate() # Parameters: idx: int, imshow: bool
+pipeline.run() # Parameters: max_iter: int,convergence_trend: bool,matrix_size: bool
+pipeline.evaluate() # Parameters: idx: int,imshow: bool
 ```
 
-2. Convenience
+2. 便利性
 
-You are invited to try out our experiments on Google Colab. First, execute all the code snippets in the `Setup` section to access our repository. Also, all you need to do is upload the `data.zip` file.
+我们诚邀您在 Google Colab 上尝试我们的实验。首先，在 `Setup` 部分执行所有代码片段，以访问我们的仓库。此外，您只需要上传 `data.zip` 文件即可。
 
-Once the experimental environment is set up, you have the choice to either run `run.py` in the terminal or adjust the default settings and then execute the script within the Jupyter notebook as you see fit.
+实验环境设置完成后，您可以选择在终端中执行 `run.py`，或者根据需要调整默认设置，并在 Jupyter 笔记本中执行该脚本。
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/XavierSpycy/NumPyNMF/blob/main/run.ipynb)
 
-For a more comprehensive setup and detailed execution instructions, please refer to the "Setup and Execution" section.
+关于更全面的设置和具体的执行教程，请参考`设置和执行`部分。
 
-## 1. :sparkles: Introduction
-It is a matrix factorization technique where all the elements of the decomposed matrices are required to be non-negative. This kind of decomposition is especially suitable for datasets where all the elements are non-negative, such as image data or text data.
+## 1. :sparkles: 简介
+NMF 是一种矩阵分解技术，其中要求分解后的所有矩阵元素都是非负的。这种分解方法尤其适用于那些元素都是非负的数据集，如图像数据或文本数据。
 
-NMF aims to decipher the following formula:
+非负矩阵分解（NMF）目的在于解决以下的公式：
 
 $$X \approx D R$$
 
 <p align="center">
   <img src="figures/NMFs.png">
   <br>
-  Figure 1. Illustration of NMF
+  图 1. 非负矩阵分解演示
 </p>
 
-Where, if 
-$X$ is of size $m \times n$, typically $D$ would be of size $m \times k$ and $R$ would be of size $k \times n$, where $k$ is a predefined number of factors and is usually less than both $m$ and $n$.
+其中，如果 $X$的大小为 $m \times n$，通常$D$的大小为 $m \times k$ 并且$R$大小为 $k \times n$，其中$k$r 是预先定义的因子数量，并且通常小于$m$和$n$.
 
-NMF has found utility in many applications, including feature extraction, image processing, and text mining.
+NMF 在许多应用中都很有用，例如特征提取、图像处理和文本挖掘。
 
-Our experiments seek to compare the robustness of various NMF variants.
-
+我们的实验为比较各种非负矩阵分解变种的稳健型（或鲁棒性）。
 <p align="center">
   <img src="figures/pin.png">
   <br>
-  Figure 2. Illustration of Our Experiments
+  Figure 2. 我们的实验演示
 </p>
 
-- **2** Datasets: ORL, Cropped YaleB              
-- **9** NMFs: $L_2$ Norm Based, $L_1$ Norm Based, KL Divergence, IS Divergence, $L_{2, 1}$ Norm Based, Hypersurface Cost, $L_1$ Norm Regularized, Capped Norm Based, Cauchy              
-- **5** Noise Types: Uniform, Gaussian, Laplacian, Block Occlusion, Salt and Pepper
+- 2个数据集： ORL， Cropped YaleB              
+- 非负矩阵分解：基于$L_2$范数（$L_2$ Norm Based）， 基于$L_1$范数（$L_1 Norm Based$）， KL散度（KL Divergence），IS散度（IS Divergence），基于 $L_{2，1}$ 范数（$L_{2，1}$ Norm Based），超表面损失（Hypersurface Cost），（$L_1$ Norm Regularized），基于Capped范数（Capped Norm Based）， Cauchy              
+- 噪声类型：均匀（Uniform）， 高斯（Gaussian），拉普拉斯（Laplacian），块状遮挡（Block Occlusion），椒盐（Salt and Pepper）
 
-## 2. :sparkles: NMF Variants
-- $L_2$ Norm Based NMF
-  - Cost Function:
+## 2. :sparkles: 非负矩阵分解变体
+- 基于$L_2$范数（$L_2$ Norm Based）非负矩阵分解
+  - 损失函数：      
   $\lVert X - DR \rVert^2 = \sum_{\substack{ijk}}(x_{ij} - d_{ik}r_{kj})^2$
-  - Update Rule:          
+  - 更新规则:          
   $\mathbf{D} \leftarrow \mathbf{D} \times \frac{\mathbf{X} \mathbf{R^\top}}{\mathbf{D} \mathbf{R} \mathbf{R^\top}}\\   
   \mathbf{R} \leftarrow \mathbf{R} \times \frac{\mathbf{D^\top} \mathbf{X}}{\mathbf{D^\top} \mathbf{D} \mathbf{R}}$
 
-- $L_1$ Norm Based NMF
-  - Cost Function:      
+- 基于$L_1$范数（$L_1$ Norm Based）非负矩阵分解
+  - 损失函数:      
   $\left | \mathbf{X - DR} \right | = \sum_{\substack{ijk}}\left | x_{ij} - d_{ik}r_{kj} \right |$
-  - Update Rule:      
+  - 更新规则:      
   $\nabla_{\mathbf{D}} = - (\mathbf{X} - \mathbf{DR}) \mathbf{R}^\top \\
     \nabla_{\mathbf{R}} = - \mathbf{D}^\top (\mathbf{X} - \mathbf{DR}) \\
-    \mathbf{D} \leftarrow \mathrm{sign}(\mathbf{D} - \alpha \nabla_{\mathbf{D}}) \times \mathrm{max}(0, |\mathbf{D} - \alpha \nabla_{\mathbf{D}}| - \alpha) \\
-    \mathbf{R} \leftarrow \mathrm{sign}(\mathbf{R} - \alpha \nabla_{\mathbf{R}}) \times \mathrm{max}(0, |\mathbf{R} - \alpha \nabla_{\mathbf{R}}| - \alpha)$
+    \mathbf{D} \leftarrow \mathrm{sign}(\mathbf{D} - \alpha \nabla_{\mathbf{D}}) \times \mathrm{max}(0,|\mathbf{D} - \alpha \nabla_{\mathbf{D}}| - \alpha) \\
+    \mathbf{R} \leftarrow \mathrm{sign}(\mathbf{R} - \alpha \nabla_{\mathbf{R}}) \times \mathrm{max}(0,|\mathbf{R} - \alpha \nabla_{\mathbf{R}}| - \alpha)$
 
-- KL Divergence NMF
-  - Cost Function:      
+- KL散度（KL Divergence）非负矩阵分解
+  - 损失函数:      
   $d_{KL}(\mathbf{X} \lVert \mathbf{DR}) = \sum_{\substack{ijk}}(x_{ij}\mathrm{log}\frac{x_{ij}}{d_{ik}r_{kj}} - x_{ij} + d_{ik}r_{kj})$
-  - Update Rule:      
+  - 更新规则:      
   $\mathbf{D} \leftarrow \mathbf{D} \times \frac{(\frac{\mathbf{X}}{\mathbf{DR}})\mathbf{R}^\top}{\mathbf{1}_{m,n} \cdot \mathbf{R}^\top}\\
   \mathbf{R} \leftarrow \mathbf{R} \times \frac{\mathbf{D}^\top \left(\frac{\mathbf{X}}{\mathbf{DR}} \right)}{\mathbf{D}^\top \cdot \mathbf{1}_{m,n}}$
 
-- IS Divergence NMF
-  - Cost Function:      
+- IS散度（IS Divergence）非负矩阵分解
+  - 损失函数:      
   $d_{IS}(\mathbf{X} \lVert \mathbf{DR}) = \frac{\mathbf{X}}{\mathbf{DR}} - \mathrm{log}\frac{\mathbf{X}}{\mathbf{DR}} - 1$
-  - Update Rule:      
+  - 更新规则:      
   $\mathbf{D} \leftarrow \mathbf{D} \times \frac{((\mathbf{DR}^{-2}) \mathbf{X})\mathbf{R}^\top}{(\mathbf{DR})^{-1} \mathbf{R}^\top}\\
   \mathbf{R} \leftarrow \mathbf{R} \times \frac{\mathbf{D}^\top ((\mathbf{DR})^{-2}\mathbf{X})}{\mathbf{D}^\top (\mathbf{DR})^{-1}}$
 
-- $L_{2, 1}$ Norm Based NMF
-  - Cost Function:      
-  $\lVert \mathbf{X - DR} \rVert_{2, 1} = \sum_{\substack{i=1}}^n \sqrt{\sum_{\substack{j=1}^p}(\mathbf{X} - \mathbf{DR})_{ji}^2}  = \sum_{\substack{i=1}}^n \lVert x_i - \mathbf{D}r_i \rVert$
-  - Update Rule:      
+- 基于$L_{2,1}$范数（$L_{2,1}$ Norm Based）非负矩阵分解
+  - 损失函数:      
+  $\lVert \mathbf{X - DR} \rVert_{2,1} = \sum_{\substack{i=1}}^n \sqrt{\sum_{\substack{j=1}^p}(\mathbf{X} - \mathbf{DR})_{ji}^2}  = \sum_{\substack{i=1}}^n \lVert x_i - \mathbf{D}r_i \rVert$
+  - 更新规则:      
   $D_{ji} \leftarrow D_{jk} \times \frac{(\mathbf{X \Lambda R^\top})_{jk}}{(\mathbf{DR\Lambda R^\top})_jk} \\
   R_{ki} \leftarrow R_{ki} \times \frac{(\mathbf{D^\top X\Lambda})_{ki}}{(\mathbf{D^\top DR\Lambda})_{jk}}\\
   $
-  where $\Lambda$ is a diagonal matrix with the diagonal elements given by,     
+  where $\Lambda$ is a diagonal matrix with the diagonal elements given by,    
   $D_{ii} = \frac{1}{\sqrt{\sum_{\substack{j=1}}^p(\mathbf{X - DR})_{ji}^2}} = \frac{1}{\lVert x_i - \mathbf{D}r_i \rVert}$
 
-- Hypersurface Cost NMF
-  - Cost Function:
-  $\phi(\mathbf{D}, \mathbf{R}) = \frac{1}{2}(\sqrt{1 + \lVert \mathbf{X} - \mathbf{DR} \rVert^2} - 1)$
-  - Update Rule:      
+- 超表面损失（Hypersurface Cost）非负矩阵分解
+  - 损失函数:
+  $\phi(\mathbf{D},\mathbf{R}) = \frac{1}{2}(\sqrt{1 + \lVert \mathbf{X} - \mathbf{DR} \rVert^2} - 1)$
+  - 更新规则:      
   $\mathbf{D} \leftarrow \mathbf{D} - \alpha\frac{\mathbf{DRR}^{\top} - \mathbf{XR}^{\top}}{\sqrt{1 + \lVert \mathbf{X} - \mathbf{DR} \rVert}}\\
   \mathbf{R} \leftarrow \mathbf{R} - \beta \frac{\mathbf{D}^{\top}\mathbf{DR} - \mathbf{D}^{\top}\mathbf{X}}{\sqrt{1 + \lVert \mathbf{X} - \mathbf{DR} \rVert}}$
 
-- $L_1$ Norm Regularized NMF
-  - Cost Function:
+- $L_1$范数正则（$L_1$ Norm Regularized）非负矩阵分解
+  - 损失函数:
   $\lVert \mathbf{X} - \mathbf{DR} - \mathbf{S}\rVert_F^2 + \lambda \lVert S \rVert_1$
-  - Update Rule:      
+  - 更新规则:      
   $\mathbf{S} \leftarrow \mathbf{X} - \mathbf{DR}\\
   \mathbf{S}_{ij} \leftarrow 
     \begin{cases}
-        \mathbf{S}_{ij} - \frac{\lambda}{2} \text{  , if} \mathbf{S}_{ij} > \frac{\lambda}{2} \\
-        \mathbf{S}_{ij} + \frac{\lambda}{2} \text{  , if} \mathbf{S}_{ij} < \frac{\lambda}{2}\\
-        0 \text{    , otherwise}
+        \mathbf{S}_{ij} - \frac{\lambda}{2} \text{  ,if} \mathbf{S}_{ij} > \frac{\lambda}{2} \\
+        \mathbf{S}_{ij} + \frac{\lambda}{2} \text{  ,if} \mathbf{S}_{ij} < \frac{\lambda}{2}\\
+        0 \text{    ,otherwise}
     \end{cases}\\
     \mathbf{D} \leftarrow \frac{\left | (\mathbf{S} - \mathbf{X})\mathbf{R}^{\top}\right | - ((\mathbf{S} - \mathbf{X})\mathbf{R}^{\top}}{2\mathbf{DRR}^{\top}}\\
     \mathbf{R} \leftarrow \frac{\left |\mathbf{D}^{\top}(\mathbf{S} - \mathbf{X})\right | - (\mathbf{D}^{\top}(\mathbf{S} - \mathbf{X})}{2\mathbf{D^{\top}}\mathbf{DR}}\\
     \mathbf{D} \leftarrow \frac{\mathbf{D}}{\sqrt{\sum^n_{k=1}\mathbf{D}_{kj}^2}}\\
     \mathbf{R} \leftarrow \mathbf{R}\sqrt{\sum^n_{k=1}\mathbf{D}_{kj}^2}$
 
-- Capped Norm Based NMF
-  - Update Rule:     
+- 基于Capped范数（Capped Norm Based）非负矩阵分解
+  - 更新规则:     
   $\mathbf{D} \leftarrow \mathbf{D}\frac{\mathbf{XIR}^\top}{\mathbf{DRIR}^{\top}}\\
   \mathbf{R} \leftarrow \mathbf{R}\sqrt{\frac{\mathbf{IXD}}{\mathbf{IR}^{\top}\mathbf{RXD}}}\\
   \mathbf{I}_{jj} = 
-    \begin{cases} \frac{1}{2\lVert x_j - \mathbf{D}r_j\rVert_2}\text{   , if} \lVert x_j - \mathbf{D}r_j\rVert \leq \theta \\
-    0 \text{    , otherwise}
-    \end{cases}$,      
+    \begin{cases} \frac{1}{2\lVert x_j - \mathbf{D}r_j\rVert_2}\text{   ,if} \lVert x_j - \mathbf{D}r_j\rVert \leq \theta \\
+    0 \text{    ,otherwise}
+    \end{cases}$,     
     where $\mathbf{I}$ is initialized as an identify mamtrix and then will be updated to a diagonal matrix.
 
-- Cauchy NMF
-  - Update Rule:         
+- Cauchy非负矩阵分解
+  - 更新规则:         
   $\theta \leftarrow \theta \cdot \frac{b_\theta}{a_\theta + \sqrt{a_\theta^2 + 2b_\theta \cdot a_\theta}}$     
-  For $\mathbf{D}$,     
+  For $\mathbf{D}$,    
   $a_\theta =  \frac{3}{4} \frac{\sigma}{\sigma^2 + \mathbf{X}} \mathbf{R}^\top\\
   b_\theta = \sigma^{-1}\mathbf{R}^\top$;     
-  For $\mathbf{R}$,     
+  For $\mathbf{R}$,    
   $a_\theta = \frac{3}{4}\mathbf{D}^{\top}\frac{\sigma}{\sigma^2 + \mathbf{X}}\\
    b_\theta = \mathbf{D}^{\top}\sigma^{-1}$
 
-## 3. :sparkles: Noise Types
-- Uniform:
+## 3. :sparkles: 噪声类型
+- 均匀:
 <p align="center">
   <img src="./figures/uniform_noise.png">
   <br>
-  Figure 3. Uniform Noise
+  图 3. 均匀噪声
 </p>
 
-- Gaussian
+- 高斯
 <p align="center">
   <img src="./figures/gaussian_noise.png">
   <br>
-  Figure 4. Gaussian Noise
+  图 4. 高斯噪声
 </p>
 
-- Laplacian
+- 拉普拉斯
 <p align="center">
   <img src="./figures/laplacian_noise.png">
   <br>
-  Figure 5. Laplacian Noise
+  图 5. 拉普拉斯噪声
 </p>
 
-- Block Occlusion
+- 块状遮挡
 <p align="center">
   <img src="figures/block_noise.png">
   <br>
-  Figure 6. Block Noise
+  图 6. 块状噪声
 </p>
 
-- Salt and Pepper
+- 椒盐
 <p align="center">
   <img src="figures/salt_and_pepper_noise.png">
   <br>
-  Figure 7. Salt and Pepper Noise
+  图 7. 椒盐噪声
 </p>
 
-## 4. :sparkles: Setup and Execution
-### Step 1. Environmental Setup
-**If you're not concerned about package version conflicts, you may skip this step.**
+## 4. :sparkles: 设置和执行
+### 步骤1. 实验设置
+**如果您不担心包版本冲突，您可以跳过这一步。**
 
-To avoid potential conflicts between package versions, we ensure smooth execution only under our specified package versions. We can't guarantee flawless operation across all versions of the related packages. However, if you have concerns or wish to ensure the highest compatibility, you can follow the steps below to create a new environment specifically for this experiment.
+为了避免包版本之间的冲突，我们只确保在我们特定包版本下顺利执行。我们无法保证在所有相关包中都完美运作。但是，如果您有担忧或者希望最高的兼容性，您可以跟随下面的步骤来创建一个专为该实验的新环境。
 
-1. **Create a New Conda Environment:**
+1. **创建一个新的Conda环境：**
 
-   First, you'll want to create a new Conda environment named `NumPyNMF`. To do this, open your terminal or command prompt and enter the following command:
+   首先，您要创建一个新的名为`NumPyNMF`的Conda环境。为了做到这点，打开您的终端或者命令提示，并输入以下的命令：
 
    ```bash
    $ conda create --name NumPyNMF python=3.8
    ```
-2. **Activate the New Environment:**
 
-    Before installing any packages or running any scripts, you must activate the `NumPyNMF` environment. To do this, enter the following command:
+2. **激活这个新环境：**
+
+    在安装任何包或运行任何脚本前，您必须激活这个环境。为了做到这点，输入以下命令：
     ```bash
     $ conda activate NumPyNMF
     ```
 
-3. **Install Required Packages:**
+3. **安装必要的包：**
 
-    Navigate to the directory where the `requirements.txt` file is located and install the necessary packages using `pip`:
+    导航到`requirements.txt`文件所在目录并用`pip`安装必要的包：
     ```bash
     $ pip install -r requirements.txt
     ```
-4. **Running the Experiment:**
+4. **运行实验**
 
-    After setting up the environment and installing the required packages, always ensure that the `NumPyNMF` environment is activated before executing any scripts.
+    在设置环境并安装必要的包后，确保在执行任何脚本前，`NumPyNMF`环境始终被激活。
 
-**Important**: As mentioned, we've tailored this environment to avoid potential version conflicts, ensuring optimal compatibility with our codebase. Please use this environment to ensure accurate and conflict-free execution.
+**重要**: 如前所提，我们已定制这个环境来避免潜在的版本冲突，以确保和我们代码最优的兼容性。请使用这个环境来确保准确和无冲突的执行。
 
-### Step 2. Experiment Execution
+### 步骤2. 实验执行
 
-To run the current experiment, follow these steps:
+要运行当前实验，遵循这些步骤：
 
-1. **Configure the Algorithm and Dataset:** In `run.py`, we provide a `Pipeline` class. You can configure your experiment by adjusting its parameters. Here's an explanation of the `Pipeline` parameters:
+1. **Configure the Algorithm and Dataset:** 在`run.py`中，我们提供一个`Pipeline`类。您可以通过调整参数来配置您的实验。这里有一则`Pipeline`参数的解释。 
 
-    - `nmf`: Choose the desired Non-negative Matrix Factorization (NMF) algorithm. Options are: `L2NormNMF`, `L1NormNMF`, `KLdivergenceNMF`, `ISdivergenceNMF`, `RobustNMF`, `HypersurfaceNMF`, `L1NormRegularizedNMF`, `CappedNormNMF`, `CauchyNMF`.
+    - `nmf`：选择想要的非负矩阵分解（NMF）算法。可选项有：`L2NormNMF`，`L1NormNMF`，`KLdivergenceNMF`，`ISdivergenceNMF`，`RobustNMF`，`HypersurfaceNMF`，`L1NormRegularizedNMF`，`CappedNormNMF`，`CauchyNMF`。
     
-    - `dataset`: Select the dataset. Options are: `ORL`, `YaleB`.
+    - `dataset`：选择数据集。可选性有：`ORL`，`YaleB`。
     
-    - `reduce`: In our experiments, use `1` for `ORL` and `3` for `YaleB`. If the value is too small, the execution time will be excessive; if too large, it will result in information loss.
+    - `reduce`：在我们的实验中，对于`ORL`用`1`，对于`YaleB`用`3`。若这个值过小，则执行时间会过多；若过大，则它会导致信息丢失。
     
-    - `noise_type`: The type of noise. Choices are: `uniform`, `gaussian`, `laplacian`, `salt_and_pepper`, `block`.
+    - `noise_type`： 噪声类型。 可选项有：`uniform`，`gaussian`，`laplacian`，`salt_and_pepper`，`block`。
     
-    - `noise_level`: The level of noise. The specific values vary depending on your choice of noise type.
+    - `noise_level`： 噪声等级。这个特定值根据您所选择的噪声类型而改变。
     
-    - `random_state`: The random seed value used in the experiment. In our experiments, we've used: `0`, `42`, `99`, `512`, `3407`.
+    - `random_state`： 实验中所用的随机种子值。在我们的实验中，我们用的：`0`，`42`，`99`，`512`，`3407`。
     
-    - `scaler`: The method for data normalization. Choices are: `MinMax`, `Standard`.
+    - `scaler`: 数据标准化方法。可选项有：`MinMax`，`Standard`。
 
-2. **Run the Pipeline:**
+2. **运行流程：**
     ```python
     pipeline.run() 
     ```
-    Optional parameters include: `max_iter` (maximum iterations), `convergence_trend` (display convergence trend), `matrix_size` (show matrix size or note), and `verbose` (show training procedure or not).
+    可选参数包括：`max_iter` （最大迭代次数），`convergence_trend` （是否显示收敛趋势），`matrix_size` （是否显示矩阵形状），以及`verbose` （是否显示训练过程）。
 
-3. **Evaluate the Results:**
+3. **评价结果：**
     ```python
     pipeline.evaluate()
     ```
-    Optional parameters are: `idx` (index), and `imshow` (display image or not).
+    可选参数有：`idx` （索引）和`imshow`（是否显示图像）。
 
-### Step 3: Running the Script in Terminal
+### 步骤3：在终端运行脚本
 
-After you've configured your experiment parameters in the `run.py` script, you can execute the experiment directly from the terminal. Follow these steps:
+在您已经在`run.py`脚本中配置好实验参数后，您可以直接从终端执行实验。遵循这些步骤:
 
-1. **Navigate to the Directory:**
+1. **导航至目录：**
    
-   First, make sure you're in the directory where the `run.py` file is located. Use the `cd` command followed by the directory path to navigate. For example:
-
+   首先，确保您在`run.py`文件所在目录。用`cd`命令，紧接着目录路径以定位。例如：
    ```bash
    $ cd path/to/your/directory/NumPyNMF
    ```
 
-2. **Execute the Script:**
+2. **执行脚本：**
 
-    Run the script using Python. Depending on your setup, you might use python, python3, or another variation. Here's the general command:
+    用Python运行脚本。依赖于您的设置，您可以用python，python3或其他变种。这里是一个通用命令：
     ```bash
     $ python run.py
     ```
-
-    If you're using Python 3 specifically and have both Python 2 and Python 3 installed, you might use:
+  
+    如果您准备专门使用Python 3并同时安装Python 2和Python 3，您可以使用：
     ```bash
     $ python3 run.py
     ```
 
-Hope this helps you carry out the experiment smoothly!
+希望这能帮助您顺利进行实验！
 
-## 5. :sparkles: Convergence Trends
+## 5. :sparkles: 收敛趋势
 </p>
 
-- $L_1$ Norm Based NMF:
+- 基于 $L_1$ 范数非负矩阵分解:
 <p align="center">
   <img src="figures/l1conv.png">
   <br>
-  Figure 8. Convergence Trend of L<sub>1</sub> Norm Based NMF
+  图 8. 基于L<sub>1</sub>范数非负矩阵分解的收敛趋势
 </p>
 
 
-- $L_{2, 1}$ Norm Based NMF:
+- 基于 $L_{2，1}$ 范数非负矩阵分解:
 <p align="center">
   <img src="figures/l21conv.png">
   <br>
-  Figure 9. Convergence Trend of L<sub>2, 1</sub> Norm Based NMF
+  图 9. 基于L<sub>2，1</sub>范数非负矩阵分解的收敛趋势
 </p>
 
-## 6. :sparkles: Results
-### 6.1. Metrics
-#### 6.1.1. What are They?
-- Root Means Square Errors (RMSE)     
+## 6. :sparkles: 结果
+### 6.1 指标
+#### 6.1.1. 它们是什么？
+- 均方根误差 (以下简称：RMSE)     
 $\mathrm{RMSE} = \sqrt{\frac{1}{N} \lVert \mathbf{X - DR} \rVert^2_F}$
-- Average Accuracy      
-$\mathrm{Acc(Y, Y_{pred})} = \frac{1}{n} \sum_{\substack{i}}^n \{\mathrm{{Y_{(pred)(i)}}} = \mathrm{Y(i)}\}$
-- Normalized Mutual Information (NMI)     
-$\mathrm{NMI(Y, Y_{pred})} = \frac{2 \times I(\mathrm{Y, Y_{pred}})}{H(\mathrm{Y}) + H(\mathrm{Y_{pred})}}$,      
-where $I(\cdot, \cdot$) is the mutual information, $H(\cdot)$ is the entropy.
+- 平均准确率      
+$\mathrm{Acc(Y,Y_{pred})} = \frac{1}{n} \sum_{\substack{i}}^n \{\mathrm{{Y_{(pred)(i)}}} = \mathrm{Y(i)}\}$
+- 标准化互信息 (以下简称：NMI)     
+$\mathrm{标准化互信息(Y,Y_{pred})} = \frac{2 \times I(\mathrm{Y,Y_{pred}})}{H(\mathrm{Y}) + H(\mathrm{Y_{pred})}}$,     
+where $I(\cdot,\cdot$) is the mutual information,$H(\cdot)$ is the entropy.
 
-#### 6.1.2. Why RMSE More Important?
+#### 6.1.2. 为什么均方根误差更重要？
 
 <p align="center">
   <img src="figures/kl-yaleb-salt.png">
   <br>
-  Figure 10. Greater RMSE, Average Accuracy and NMI
+  图 10. 更大的均方根误差，平均准确率和标准化互信息
 </p>
 
 <p align="center">
   <img src="figures/l1normreg-yaleb-salt.png">
   <br>
-  Figure 11. Less RMSE, Average Accuracy and NMI
+  图 11. 更小的均方根误差，平均准确率和标准化互信息
 </p>
 
-As illustrated in Figure 10, the reconstructed image exhibits a higher level of granularity.
+如图10所示，重建图片展现出了更高水平的颗粒度。
 
-### 6.2. Performance on ORL and YaleB Datasets
-In our preliminary experiments, we observed that certain NMFs might not perform optimally on our specific datasets. This could be attributed to:
+### 6.2. 在ORL和YaleB数据集上的性能
+在我们的预实验中，我们观察到某些非负矩阵分解可能在特定的数据集上表现得不好。这可能归咎于：
+- 数据集的内在特性。
+- 潜在实现错误（我们将此留在未来的工作中）。
 
-- The inherent characteristics of the datasets.
-- Potential implementation errors (we leave this to future
-work).
-
-We warmly welcome you to delve into our source code and contribute to its enhancement.
+我们热烈欢迎您深入我们的源代码并对其做出贡献。
 
 <style>
-    table, th, td {
+    table,th,td {
         border: 1px solid black;
         text-align: center;
     }
@@ -354,25 +350,25 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
 <table border="1">
     <thead>
         <tr>
-            <th rowspan="2">Dataset</th>
-            <th rowspan="2">Noise Type</th>
-            <th rowspan="2">Noise Level</th>
-            <th rowspan="2">Metrics</th>
-            <th colspan="4">NMF Algorithm</th>
+            <th rowspan="2">数据集</th>
+            <th rowspan="2">噪声类型</th>
+            <th rowspan="2">噪声水平</th>
+            <th rowspan="2">指标</th>
+            <th colspan="4">非负矩阵分解算法</th>
         </tr>
         <tr>
-            <th><i>L<sub>2</sub></i> Norm</th>
-            <th><i>L<sub>2,1</sub></i> Norm</th>
-            <th>KL Divergence</th>
-            <th><i>L<sub>1</sub></i> Norm Regularized</th>
+            <th><i>L<sub>2</sub></i>范数</th>
+            <th><i>L<sub>2,1</sub></i>范数</th>
+            <th>KL散度</th>
+            <th><i>L<sub>1</sub></i>范数正则</th>
         </tr>
     </thead>
     <tbody>
         <tr>
             <td rowspan="36">ORL</td>
-            <td rowspan="12">Uniform</td>
+            <td rowspan="12">均匀</td>
             <td rowspan="6">0.1</td>
-            <td rowspan="2">RMSE</td>
+            <td rowspan="2">均方根误差</td>
             <td>.1082</td>
             <td>.1119</td>
             <td><b>.1079</b></td>
@@ -385,7 +381,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(.0006)</td>
         </tr>
         <tr>
-          <td rowspan="2">Average Accuracy</td>
+          <td rowspan="2">平均准确率</td>
             <td>.5694</td>
             <td>.5889</td>
             <td>.5805</td>
@@ -398,7 +394,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(<i>.0234</i>)</td>
         </tr>
         <tr>
-          <td rowspan="2">NMI</td>
+          <td rowspan="2">标准化互信息</td>
             <td>.7364</td>
             <td>.7497</td>
             <td>.7412</td>
@@ -411,7 +407,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(.0183)</td>
         </tr>
         <td rowspan="6">0.3</td>
-            <td rowspan="2">RMSE</td>
+            <td rowspan="2">均方根误差</td>
             <td>.2395</td>
             <td>.2410</td>
             <td><b>.2388</b></td>
@@ -424,7 +420,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(.0006)</td>
         </tr>
         <tr>
-          <td rowspan="2">Average Accuracy</td>
+          <td rowspan="2">平均准确率</td>
             <td>.5694</td>
             <td>.5889</td>
             <td>.5805</td>
@@ -437,7 +433,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(.0019)</td>
         </tr>
         <tr>
-          <td rowspan="2">NMI</td>
+          <td rowspan="2">标准化互信息</td>
             <td>.7509</td>
             <td>.7367</td>
             <td>.7524</td>
@@ -450,9 +446,9 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(<i>.0113</i>)</td>
         </tr>
         <tr>
-            <td rowspan="12">Block</td>
+            <td rowspan="12">块状</td>
             <td rowspan="6">10</td>
-            <td rowspan="2">RMSE</td>
+            <td rowspan="2">均方根误差</td>
             <td>.1048</td>
             <td>.1049</td>
             <td>.0957</td>
@@ -465,7 +461,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(<i>.0003</i>)</td>
         </tr>
         <tr>
-          <td rowspan="2">Average Accuracy</td>
+          <td rowspan="2">平均准确率</td>
             <td>.4878</td>
             <td>.5089</td>
             <td>.5450</td>
@@ -478,7 +474,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(<i>.0077</i>)</td>
         </tr>
         <tr>
-          <td rowspan="2">NMI</td>
+          <td rowspan="2">标准化互信息</td>
             <td>.6647</td>
             <td>.6938</td>
             <td>.7074</td>
@@ -491,7 +487,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(<i>.0061</i>)</td>
         </tr>
         <td rowspan="6">20</td>
-            <td rowspan="2">RMSE</td>
+            <td rowspan="2">均方根误差</td>
             <td>.2062</td>
             <td>.2039</td>
             <td>.1931</td>
@@ -504,7 +500,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(.0046)</td>
         </tr>
         <tr>
-          <td rowspan="2">Average Accuracy</td>
+          <td rowspan="2">平均准确率</td>
             <td>.2466</td>
             <td>.2833</td>
             <td><b>.3133</b></td>
@@ -517,7 +513,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(.0019)</td>
         </tr>
         <tr>
-          <td rowspan="2">NMI</td>
+          <td rowspan="2">标准化互信息</td>
             <td>.4317</td>
             <td>.4768</td>
             <td><b>.5037</b></td>
@@ -530,9 +526,9 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(.0276)</td>
         </tr>
         <tr>
-            <td rowspan="12">Salt and Pepper</td>
+            <td rowspan="12">椒盐</td>
             <td rowspan="6">0.02</td>
-            <td rowspan="2">RMSE</td>
+            <td rowspan="2">均方根误差</td>
             <td>.0830</td>
             <td>.0863</td>
             <td>.0824</td>
@@ -545,7 +541,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(<i>.0003</i>)</td>
         </tr>
         <tr>
-          <td rowspan="2">Average Accuracy</td>
+          <td rowspan="2">平均准确率</td>
             <td>.5829</td>
             <td>.5655</td>
             <td>.5778</td>
@@ -558,7 +554,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(.0196)</td>
         </tr>
         <tr>
-          <td rowspan="2">NMI</td>
+          <td rowspan="2">标准化互信息</td>
             <td>.7496</td>
             <td>.7444</td>
             <td>.7446</td>
@@ -571,7 +567,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(<i>.0115</i>)</td>
         </tr>
         <td rowspan="6">0.1</td>
-            <td rowspan="2">RMSE</td>
+            <td rowspan="2">均方根误差</td>
             <td>.1111</td>
             <td>.1130</td>
             <td>.1057</td>
@@ -584,7 +580,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(.0008)</td>
         </tr>
         <tr>
-          <td rowspan="2">Average Accuracy</td>
+          <td rowspan="2">平均准确率</td>
             <td>.5450</td>
             <td>.5322</td>
             <td>.5678</td>
@@ -597,7 +593,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(.0019)</td>
         </tr>
         <tr>
-          <td rowspan="2">NMI</td>
+          <td rowspan="2">标准化互信息</td>
             <td>.7379</td>
             <td>.7316</td>
             <td>.7360</td>
@@ -611,9 +607,9 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
         </tr>
         <tr>
             <td rowspan="42">Cropped YaleB</td>
-            <td rowspan="12">Gaussian</td>
+            <td rowspan="12">高斯</td>
             <td rowspan="6">0.1</td>
-            <td rowspan="2">RMSE</td>
+            <td rowspan="2">均方根误差</td>
             <td>.0786</td>
             <td>.0784</td>
             <td rowspan="2"> > 3000</td>
@@ -625,7 +621,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(<i>.0002</i>)</td>
         </tr>
         <tr>
-          <td rowspan="2">Average Accuracy</td>
+          <td rowspan="2">平均准确率</td>
             <td><b>.1808</b></td>
             <td>.1769</td>
             <td>.0592</td>
@@ -638,7 +634,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(.0078)</td>
         </tr>
         <tr>
-          <td rowspan="2">NMI</td>
+          <td rowspan="2">标准化互信息</td>
             <td><b>.2651</b></td>
             <td>.2459</td>
             <td>.0601</td>
@@ -651,7 +647,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(.0143)</td>
         </tr>
         <td rowspan="6">0.3</td>
-            <td rowspan="2">RMSE</td>
+            <td rowspan="2">均方根误差</td>
             <td rowspan="2">> 2</td>
             <td rowspan="2">> 12</td>
             <td rowspan="2">> 3000</td>
@@ -661,7 +657,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td><i>(.0017)</i></td>
         </tr>
         <tr>
-          <td rowspan="2">Average Accuracy</td>
+          <td rowspan="2">平均准确率</td>
             <td>.0779</td>
             <td>.0609</td>
             <td>.0584</td>
@@ -674,7 +670,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(.0065)</td>
         </tr>
         <tr>
-          <td rowspan="2">NMI</td>
+          <td rowspan="2">标准化互信息</td>
             <td>.0905</td>
             <td>.0657</td>
             <td>.0636</td>
@@ -687,9 +683,9 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(.0122)</td>
         </tr>
         <tr>
-            <td rowspan="6">Laplacian</td>
+            <td rowspan="6">拉普拉斯</td>
             <td rowspan="6">0.1</td>
-            <td rowspan="2">RMSE</td>
+            <td rowspan="2">均方根误差</td>
             <td>.0766</td>
             <td>.0759</td>
             <td rowspan="2">> 6000</td>
@@ -701,7 +697,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(<i>.0001</i>)</td>
         </tr>
         <tr>
-          <td rowspan="2">Average Accuracy</td>
+          <td rowspan="2">平均准确率</td>
             <td>.1699</td>
             <td><b>.1785</b></td>
             <td>.0585</td>
@@ -714,7 +710,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(<i>.0010</i>)</td>
         </tr>
         <tr>
-          <td rowspan="2">NMI</td>
+          <td rowspan="2">标准化互信息</td>
             <td>.2509</td>
             <td><b>.2553</b></td>
             <td>.0583</td>
@@ -727,9 +723,9 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(.0057)</td>
         </tr>
         <tr>
-            <td rowspan="12">Block</td>
+            <td rowspan="12">块状</td>
             <td rowspan="6">10</td>
-            <td rowspan="2">RMSE</td>
+            <td rowspan="2">均方根误差</td>
             <td>.1720</td>
             <td>.1702</td>
             <td>.01567</td>
@@ -742,7 +738,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(.0108)</td>
         </tr>
         <tr>
-          <td rowspan="2">Average Accuracy</td>
+          <td rowspan="2">平均准确率</td>
             <td>.0924</td>
             <td>.1004</td>
             <td>.1108</td>
@@ -755,7 +751,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(<i>.0024</i>)</td>
         </tr>
         <tr>
-          <td rowspan="2">NMI</td>
+          <td rowspan="2">标准化互信息</td>
             <td>.1034</td>
             <td>.1156</td>
             <td>.1352</td>
@@ -768,7 +764,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(.0134)</td>
         </tr>
         <td rowspan="6">20</td>
-            <td rowspan="2">RMSE</td>
+            <td rowspan="2">均方根误差</td>
             <td>.3626</td>
             <td>.3603</td>
             <td>.3576</td>
@@ -781,7 +777,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(.0082)</td>
         </tr>
         <tr>
-          <td rowspan="2">Average Accuracy</td>
+          <td rowspan="2">平均准确率</td>
             <td>.0796</td>
             <td>.0796</td>
             <td><b>.0833</b></td>
@@ -794,7 +790,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(.0034)</td>
         </tr>
         <tr>
-          <td rowspan="2">NMI</td>
+          <td rowspan="2">标准化互信息</td>
             <td>.1043</td>
             <td>.1156</td>
             <td><b>.1352</b></td>
@@ -807,9 +803,9 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(.0015)</td>
         </tr>
         <tr>
-            <td rowspan="12">Salt and Pepper</td>
+            <td rowspan="12">椒盐</td>
             <td rowspan="6">0.02</td>
-            <td rowspan="2">RMSE</td>
+            <td rowspan="2">均方根误差</td>
             <td>.0743</td>
             <td>.0749</td>
             <td>.0792</td>
@@ -822,7 +818,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(.0015)</td>
         </tr>
         <tr>
-          <td rowspan="2">Average Accuracy</td>
+          <td rowspan="2">平均准确率</td>
             <td>.1927</td>
             <td><b>.1994</b></td>
             <td>.1852</td>
@@ -835,7 +831,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(.0113)</td>
         </tr>
         <tr>
-          <td rowspan="2">NMI</td>
+          <td rowspan="2">标准化互信息</td>
             <td>.2688</td>
             <td><b>.2701</b></td>
             <td>.2665</td>
@@ -848,7 +844,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(.0120)</td>
         </tr>
         <td rowspan="6">0.1</td>
-            <td rowspan="2">RMSE</td>
+            <td rowspan="2">均方根误差</td>
             <td>.1271</td>
             <td>.1227</td>
             <td>.1106</td>
@@ -861,7 +857,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(.0015)</td>
         </tr>
         <tr>
-          <td rowspan="2">Average Accuracy</td>
+          <td rowspan="2">平均准确率</td>
             <td>.1418</td>
             <td>.1312</td>
             <td><b>.1592</b></td>
@@ -874,7 +870,7 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
             <td>(.0015)</td>
         </tr>
         <tr>
-          <td rowspan="2">NMI</td>
+          <td rowspan="2">标准化互信息</td>
             <td>.1851</td>
             <td>.1898</td>
             <td><b>.2248</b></td>
@@ -889,49 +885,49 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
     </tbody>
 </table>
 
-### 6.3. Reconstruction Effects
-- Gaussian Noise Reconstruction
+### 6.3. 重建效果
+- 高斯噪声重建
 <p align="center">
   <img src="figures/yaleb-gau-recon.png">
   <br>
-  Figure 12. Gaussian Noise Reconstruction (Noise Level: 0.16)
+  图 12. 高斯噪声重建 (噪声水平: 0.16)
 </p>
 
-- Laplacian Noise Reconstruction
+- 拉普拉斯噪声重建
 <p align="center">
   <img src="figures/yaleb-lap-recon.png">
   <br>
-  Figure 13. Laplacian Noise Reconstruction (Noise Level: 0.1)
+  图 13. 拉普拉斯噪声重建 (噪声水平: 0.1)
 </p>
 
-- Uniform Noise Reconstruction
+- 均匀噪声重建
 <p align="center">
   <img src="figures/yaleb-uniform-recon.png">
   <br>
-  Figure 14. Uniform Noise Reconstruction (Noise Level: 0.1)
+  图 14. 均匀噪声重建 (噪声水平: 0.1)
 </p>
 
-- Block Occlusion Noise Reconstruction
+- 块状遮挡噪声重建
 <p align="center">
   <img src="figures/yaleb-block-10-recon.png">
   <br>
-  Figure 15. Block Occlusion Noise Reconstruction (Block Size: 10)
+  图 15. 块状遮挡噪声重建 (块状大小: 10)
 </p>
 
 <p align="center">
   <img src="figures/yaleb-block-20-recon.png">
   <br>
-  Figure 16. Block Occlusion Noise Reconstruction (Block Size: 20)
+  图 16. 块状遮挡噪声重建（块状大小：20）
 </p>
 
-- Salt and Pepper Noise Reconstruction
+- 椒盐噪声重建
 <p align="center">
   <img src="figures/l1normreg-yaleb-salt.png">
   <br>
-  Figure 17. Salt and Pepper Noise Reconstruction (Noise Level: 0.1)
+  图 17. 椒盐噪声重建（噪声水平：0.1）
 </p>
 
-## 7. :sparkles: Project Structure
+## 7. :sparkles: 项目结构
 ```
 ├── NumPyNMF/
 │   ├── algorithm/
@@ -960,45 +956,44 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
 ```
 
 ## 8. TODO
-- NumPy Memory Preallocation
-- Reasons for Algorithmic Non-Functionality
-- GUI Interface
+- NumPy内存预分配
+- 算法故障愿意
+- GUI界面
 
-## 9. :handshake: Contribution
-We welcome contributions of any kind, whether it's suggesting new features, reporting bugs, or helping with code optimizations. Here are the steps to get started:
+## 9. :handshake: 贡献
+我们欢迎任何形式的贡献，无论是提出新功能的建议，报告bug，还是帮助优化代码。以下是开始的步骤：
 
-### 1. Fork the Project:
-- Fork this repository by clicking the "Fork" button on the top right corner of this page.
+### 1. Fork项目:
+- 通过点击GitHub页面上的“Fork”按钮，将此项目复制到您的GitHub帐户。
 
-### 2. Clone Your Fork:
+### 2. 克隆你的Fork:
 ```bash
 git clone https://github.com/YOUR_USERNAME/PROJECT_NAME.git
 ```
 
-Then navigate to the project directory:
+然后进入项目目录：
 ```bash
 cd PROJECT_NAME
 ```
-### 3. Create a New Branch:
-- Name your branch based on the change you're implementing, e.g., `feature/new-feature` or `bugfix/issue-name`:
-
+### 3. 创建一个新的分支:
+- 基于您想要做的更改为您的分支命名，例如，`feature/new-feature`或`bugfix/issue-name`:
 ```bash
 git checkout -b branch-name
 ```
 
-### 4. Commit Your Changes:
-- Make your changes on this branch and then commit them.
+### 4. 提交您的更改:
+- 在此分支上做出您的更改，然后提交它们。
   ```bash
   git add .
   git commit -m "Describe your changes here"
   ```
-### 5. Push the Branch to Your Fork:
+### 5. 将分支推送到您的Fork:
 ```bash
 git push origin branch-name
 ```
 
-### 6. Open a Pull Request:
-- Go back to your fork on GitHub, and click "New Pull Request". Choose the branch you just pushed and submit the pull request.
+### 6. 提交一个拉取请求:
+- 返回到您fork的GitHub页面，并点击“New Pull Request”。选择您刚刚推送的分支，然后提交拉取请求。
 
 ### 7. Wait for Review:
-- The maintainers of the project will review your pull request. They might request some changes or merge it.
+- 项目维护者会审查您的拉取请求。他们可能会请求一些更改或对其进行合并。
