@@ -43,7 +43,7 @@ pipeline.evaluate() # Parameters: idx: int, imshow: bool
 
 2. Convenience
 
-You are invited to try out our experiments on Google Colab. First, execute all the code snippets in the `Setup` section to access our repository. Also, all you need to do is upload the `data.zip` file.
+You are invited to try out our experiments on Google Colab. First, execute all the code snippets in the `Setup` section to access our repository. ~~Also, all you need to do is upload the `data.zip` file~~. (You no longer need to upload the `data.zip` file.)
 
 Once the experimental environment is set up, you have the choice to either run `run.py` in the terminal or adjust the default settings and then execute the script within the Jupyter notebook as you see fit.
 

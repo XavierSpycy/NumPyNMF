@@ -44,7 +44,7 @@ pipeline.evaluate() # Parameters: idx: int,imshow: bool
 
 2. 便利性
 
-我们诚邀您在 Google Colab 上尝试我们的实验。首先，在 `Setup` 部分执行所有代码片段，以访问我们的仓库。此外，您只需要上传 `data.zip` 文件即可。
+我们诚邀您在 Google Colab 上尝试我们的实验。首先，在 `Setup` 部分执行所有代码片段，以访问我们的仓库。~~此外，您只需要上传 `data.zip` 文件即可~~。(您不再需要上传 `data.zip` 文件。)
 
 实验环境设置完成后，您可以选择在终端中执行 `run.py`，或者根据需要调整默认设置，并在 Jupyter 笔记本中执行该脚本。
 
@@ -65,7 +65,7 @@ $$X \approx D R$$
   图 1. 非负矩阵分解演示
 </p>
 
-其中，如果 $X$ 的大小为 $m \times n$，通常 $D$ 的大小为 $m \times k$ 并且 $R$ 大小为 $k \times n$，其中 $k$ 是预先定义的因子数量，并且通常小于 $m$ 和 $n$ .
+其中，如果 $X$ 的大小为 $m \times n$，通常 $D$ 的大小为 $m \times k$ 并且 $R$ 大小为 $k \times n$，其中 $k$ 是预先定义的因子数量，并且通常小于 $m$ 和 $n$ 。
 
 NMF 在许多应用中都很有用，例如特征提取、图像处理和文本挖掘。
 
@@ -78,20 +78,20 @@ NMF 在许多应用中都很有用，例如特征提取、图像处理和文本�
 </p>
 
 - **2个**数据集： ORL， Cropped YaleB              
-- **9种**非负矩阵分解：基于$L_2$范数（$L_2$ Norm Based）， 基于$L_1$范数（$L_1 Norm Based$）， KL散度（KL Divergence），IS散度（IS Divergence），基于 $L_{2，1}$ 范数（$L_{2，1}$ Norm Based），超表面损失（Hypersurface Cost），（$L_1$ Norm Regularized），基于Capped范数（Capped Norm Based）， Cauchy              
+- **9种**非负矩阵分解：基于 $L_2$ 范数（ $L_2$ Norm Based）， 基于$L_1$ 范数（ $L_1 Norm Based$）， KL散度（KL Divergence），IS散度（IS Divergence），基于 $L_{2，1}$ 范数（ $L_{2，1}$ Norm Based），超表面损失（Hypersurface Cost），$L_1$ 范数正则（ $L_1$ Norm Regularized），基于Capped范数（Capped Norm Based）， 柯西（Cauchy）              
 - **5种**噪声类型：均匀（Uniform）， 高斯（Gaussian），拉普拉斯（Laplacian），块状遮挡（Block Occlusion），椒盐（Salt and Pepper）
 
 ## 2. :sparkles: 非负矩阵分解变体
 **提示**：GitHub本身不支持在Markdown预览中渲染LaTeX数学公式，部分公式可能无法正常显示。请您可以使用其他工具来查看这些公式。
 
-- 基于$L_2$范数（$L_2$ Norm Based）非负矩阵分解
+- 基于 $L_2$ 范数（ $L_2$ Norm Based）非负矩阵分解
   - 损失函数：      
   $\lVert X - DR \rVert^2 = \sum_{\substack{ijk}}(x_{ij} - d_{ik}r_{kj})^2$
   - 更新规则:          
   $\mathbf{D} \leftarrow \mathbf{D} \times \frac{\mathbf{X} \mathbf{R^\top}}{\mathbf{D} \mathbf{R} \mathbf{R^\top}}\\   
   \mathbf{R} \leftarrow \mathbf{R} \times \frac{\mathbf{D^\top} \mathbf{X}}{\mathbf{D^\top} \mathbf{D} \mathbf{R}}$
 
-- 基于$L_1$范数（$L_1$ Norm Based）非负矩阵分解
+- 基于 $L_1$ 范数（ $L_1$ Norm Based）非负矩阵分解
   - 损失函数:      
   $\left | \mathbf{X - DR} \right | = \sum_{\substack{ijk}}\left | x_{ij} - d_{ik}r_{kj} \right |$
   - 更新规则:      
@@ -114,7 +114,7 @@ NMF 在许多应用中都很有用，例如特征提取、图像处理和文本�
   $\mathbf{D} \leftarrow \mathbf{D} \times \frac{((\mathbf{DR}^{-2}) \mathbf{X})\mathbf{R}^\top}{(\mathbf{DR})^{-1} \mathbf{R}^\top}\\
   \mathbf{R} \leftarrow \mathbf{R} \times \frac{\mathbf{D}^\top ((\mathbf{DR})^{-2}\mathbf{X})}{\mathbf{D}^\top (\mathbf{DR})^{-1}}$
 
-- 基于$L_{2,1}$范数（$L_{2,1}$ Norm Based）非负矩阵分解
+- 基于 $L_{2,1}$ 范数（ $L_{2,1}$ Norm Based）非负矩阵分解
   - 损失函数:      
   $\lVert \mathbf{X - DR} \rVert_{2,1} = \sum_{\substack{i=1}}^n \sqrt{\sum_{\substack{j=1}^p}(\mathbf{X} - \mathbf{DR})_{ji}^2}  = \sum_{\substack{i=1}}^n \lVert x_i - \mathbf{D}r_i \rVert$
   - 更新规则:      
@@ -131,7 +131,7 @@ NMF 在许多应用中都很有用，例如特征提取、图像处理和文本�
   $\mathbf{D} \leftarrow \mathbf{D} - \alpha\frac{\mathbf{DRR}^{\top} - \mathbf{XR}^{\top}}{\sqrt{1 + \lVert \mathbf{X} - \mathbf{DR} \rVert}}\\
   \mathbf{R} \leftarrow \mathbf{R} - \beta \frac{\mathbf{D}^{\top}\mathbf{DR} - \mathbf{D}^{\top}\mathbf{X}}{\sqrt{1 + \lVert \mathbf{X} - \mathbf{DR} \rVert}}$
 
-- $L_1$范数正则（$L_1$ Norm Regularized）非负矩阵分解
+- $L_1$ 范数正则（ $L_1$ Norm Regularized）非负矩阵分解
   - 损失函数:
   $\lVert \mathbf{X} - \mathbf{DR} - \mathbf{S}\rVert_F^2 + \lambda \lVert S \rVert_1$
   - 更新规则:      
@@ -157,7 +157,7 @@ NMF 在许多应用中都很有用，例如特征提取、图像处理和文本�
     \end{cases}$,     
     where $\mathbf{I}$ is initialized as an identify mamtrix and then will be updated to a diagonal matrix.
 
-- Cauchy非负矩阵分解
+- 柯西（Cauchy）非负矩阵分解
   - 更新规则:         
   $\theta \leftarrow \theta \cdot \frac{b_\theta}{a_\theta + \sqrt{a_\theta^2 + 2b_\theta \cdot a_\theta}}$     
   For $\mathbf{D}$,    
@@ -963,7 +963,7 @@ where $I(\cdot,\cdot$) is the mutual information,$H(\cdot)$ is the entropy.
 
 ## 8. TODO
 - NumPy内存预分配
-- 算法故障愿意
+- 算法故障原因
 - GUI界面
 
 ## 9. :handshake: 贡献
@@ -1001,5 +1001,5 @@ git push origin branch-name
 ### 6. 提交一个拉取请求:
 - 返回到您fork的GitHub页面，并点击“New Pull Request”。选择您刚刚推送的分支，然后提交拉取请求。
 
-### 7. Wait for Review:
+### 7. 等待审议:
 - 项目维护者会审查您的拉取请求。他们可能会请求一些更改或对其进行合并。

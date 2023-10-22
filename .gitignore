@@ -165,5 +165,3 @@ cython_debug/
 *.ipynb
 !run.ipynb
 
-data/CroppedYaleB
-data/ORL
