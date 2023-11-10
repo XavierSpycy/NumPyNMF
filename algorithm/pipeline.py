@@ -3,7 +3,7 @@ import numpy as np
 from algorithm.datasets import load_data, get_image_size
 from algorithm.preprocess import NoiseAdder, MinMaxScaler, StandardScaler
 from algorithm.sample import random_sample
-from algorithm.NMF import L2NormNMF, L1NormNMF, KLdivergenceNMF, ISdivergenceNMF, RobustNMF, HypersurfaceNMF, L1NormRegularizedNMF, CappedNormNMF, CauchyNMF
+from algorithm.NMF import L2NormNMF, L1NormNMF, KLDivergenceNMF, ISDivergenceNMF, RobustNMF, HypersurfaceNMF, L1NormRegularizedNMF, CappedNormNMF, CauchyNMF
 from algorithm.user_evaluate import evaluate
 
 class Pipeline:
@@ -27,8 +27,8 @@ class Pipeline:
         self.nmf_dict = {
                 'L2NormNMF': L2NormNMF,
                 'L1NormNMF': L1NormNMF,
-                'KLdivergenceNMF': KLdivergenceNMF,
-                'ISdivergenceNMF': ISdivergenceNMF,
+                'KLdivergenceNMF': KLDivergenceNMF,
+                'ISdivergenceNMF': ISDivergenceNMF,
                 'RobustNMF': RobustNMF,
                 'HypersurfaceNMF': HypersurfaceNMF,
                 'L1NormRegularizedNMF': L1NormRegularizedNMF,
@@ -89,9 +89,10 @@ class Pipeline:
         None. The function will run the pipeline.
         """
         # Choose an NMF
-        nmf = self.nmf_dict.get(self.nmf, 'L1NormRegularizedNMF')
+        nmf = self.nmf_dict.get(self.nmf, 'L1NormRegularizedNMF')()
+        nmf.fit(self.__X_noise_scaled, len(set(self.__Y_hat)), max_iter=max_iter, random_state=self.random_state, imshow=convergence_trend, verbose=verbose)
         # Run NMF
-        self.D, self.R = nmf(self.__X_noise_scaled, len(set(self.__Y_hat)), max_iter=max_iter, random_state=self.random_state, imshow=convergence_trend, verbose=verbose)
+        self.D, self.R = nmf.D, nmf.R
         if matrix_size:
             print('D.shape={}, R.shape={}'.format(self.D.shape, self.R.shape))
 
