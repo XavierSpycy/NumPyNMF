@@ -13,7 +13,7 @@
   - [6.2. 在ORL和YaleB数据集上的性能](#62-在orl和yaleb数据集上的性能)
   - [6.3. 重建效果](#63-重建效果)
 - [7. 项目结构](#7-sparkles-项目结构)
-- [8. TODO](#8-todo)
+- [8. 更新日志 & TODO清单](#8-更新日志--todo清单)
 - [9. 贡献](#9-handshake-贡献)
 
 :pushpin: **重要提示**：
@@ -29,18 +29,62 @@
 ```python
 from algorithm.pipeline import Pipeline
 
-pipeline = Pipeline(nmf='L1NormRegularizedNMF',# Options: 'L2NormNMF','L1NormNMF','KLdivergenceNMF','ISdivergenceNMF','RobustNMF','HypersurfaceNMF','L1NormRegularizedNMF','CappedNormNMF','CauchyNMF'
-                    dataset='ORL',# Options: 'ORL','YaleB'
-                    reduce=1,# ORL: 1,YaleB: 3
-                    noise_type='uniform',# Options: 'uniform','gaussian','laplacian','salt_and_pepper','block'
-                    noise_level=0.02,# Uniform,Gassian,Laplacian: [.1,.3],Salt and Pepper: [.02,.10],Block: [10,20]
-                    random_state=3407,# 0,42,99,512,3407 in our experiments
-                    scaler='MinMax') # Options: 'MinMax','Standard'
+pipeline = Pipeline(nmf='L1NormRegularizedNMF', # Options: 'L2NormNMF', 'L1NormNMF', 'KLDivergenceNMF', 'ISDivergenceNMF', 'L21NormNMF', 'HSCostNMF', 'L1NormRegularizedNMF', 'CappedNormNMF', 'CauchyNMF'
+                    dataset='YaleB', # Options: 'ORL', 'YaleB'
+                    reduce=3, # ORL: 1, YaleB: 3
+                    noise_type='salt_and_pepper', # Options: 'uniform', 'gaussian', 'laplacian', 'salt_and_pepper', 'block'
+                    noise_level=0.08, # Uniform, Gassian, Laplacian: [.1, .3], Salt and Pepper: [.02, .10], Block: [10, 20]
+                    random_state=99, # 0, 42, 99, 512, 3407 in our experiments
+                    scaler='MinMax') # Options: 'MinMax', 'Standard'
 
 # Run the pipeline
-pipeline.run() # Parameters: max_iter: int,convergence_trend: bool,matrix_size: bool
-pipeline.evaluate() # Parameters: idx: int,imshow: bool
+pipeline.run(max_iter=500, verbose=True) # Parameters: max_iter: int, convergence_trend: bool, matrix_size: bool, verbose: bool
+pipeline.evaluate(idx=9, imshow=True) # Parameters: idx: int, imshow: bool
 ```
+
+我们的开发框架助您只需几行代码即可轻松创建您自己的NMF算法。这里是您怎样开始:
+```python
+import numpy as np
+from algorithm.nmf import BasicNMF
+from algorithm.pipeline import Pipeline
+
+class ExampleNMF(BasicNMF):
+    # To tailor a unique NMF algorithm, subclass BasicNMF and redefine matrix_init and update methods.
+    def matrix_init(self, X, n_components, random_state=None):
+        # Implement your initialization logic here.
+        # Although we provide built-in methods, crafting a bespoke initialization can markedly boost performance.
+        # D, R = <your_initialization_logic>
+        # D, R = np.array(D), np.array(R)
+        return D, R  # Ensure D, R are returned.
+
+    def update(self, X, kwargs):
+        # Implement the logic for iterative updates here.
+        # Modify self.D, self.R as per your algorithm's logic.
+        # flag = <convergence_criterion>
+        return flag  # Return True if converged, else False.
+```
+
+用我们的流水线无缝测试您的算法的初步性能:
+```python
+pipeline = Pipeline(nmf=ExampleNMF(),
+                    dataset='YaleB',
+                    reduce=3,
+                    noise_type='salt_and_pepper',
+                    noise_level=0.08,
+                    random_state=99,
+                    scaler='MinMax')
+```
+为了一个完整的评估，贯穿我们的数据集进行试验:
+```python
+from algorithm.pipeline import Experiment
+
+exp = Experiment()
+# This step is very time-consuming, please be patient.
+# If you achieve a better performance, congratulations! 
+# You can share your results with us.
+exp.multi_datasets('L1NormRegularizedNMF')
+```
+注意: 这个 `Experiment` 函数接受表示内置算法的一个字符串或者一个 `BasicNMF` 对象，帮助您直接评价您自定义的NMF算法。
 
 2. 便利性
 
@@ -78,7 +122,7 @@ NMF 在许多应用中都很有用，例如特征提取、图像处理和文本�
 </p>
 
 - **2个**数据集： ORL， Cropped YaleB              
-- **9种**非负矩阵分解：基于 $L_2$ 范数（ $L_2$ Norm Based）， 基于$L_1$ 范数（ $L_1 Norm Based$）， KL散度（KL Divergence），IS散度（IS Divergence），基于 $L_{2，1}$ 范数（ $L_{2，1}$ Norm Based），超表面损失（Hypersurface Cost），$L_1$ 范数正则（ $L_1$ Norm Regularized），基于Capped范数（Capped Norm Based）， 柯西（Cauchy）              
+- **8种**非负矩阵分解：基于 $L_2$ 范数（ $L_2$ Norm Based）， KL散度（KL Divergence），IS散度（IS Divergence），基于 $L_{2，1}$ 范数（ $L_{2，1}$ Norm Based），超表面损失（Hypersurface Cost），$L_1$ 范数正则（ $L_1$ Norm Regularized），基于Capped范数（Capped Norm Based）， 柯西（Cauchy）              
 - **5种**噪声类型：均匀（Uniform）， 高斯（Gaussian），拉普拉斯（Laplacian），块状遮挡（Block Occlusion），椒盐（Salt and Pepper）
 
 ## 2. :sparkles: 非负矩阵分解变体
@@ -90,15 +134,6 @@ NMF 在许多应用中都很有用，例如特征提取、图像处理和文本�
   - 更新规则:          
   $\mathbf{D} \leftarrow \mathbf{D} \times \frac{\mathbf{X} \mathbf{R^\top}}{\mathbf{D} \mathbf{R} \mathbf{R^\top}}\\   
   \mathbf{R} \leftarrow \mathbf{R} \times \frac{\mathbf{D^\top} \mathbf{X}}{\mathbf{D^\top} \mathbf{D} \mathbf{R}}$
-
-- 基于 $L_1$ 范数（ $L_1$ Norm Based）非负矩阵分解
-  - 损失函数:      
-  $\left | \mathbf{X - DR} \right | = \sum_{\substack{ijk}}\left | x_{ij} - d_{ik}r_{kj} \right |$
-  - 更新规则:      
-  $\nabla_{\mathbf{D}} = - (\mathbf{X} - \mathbf{DR}) \mathbf{R}^\top \\
-    \nabla_{\mathbf{R}} = - \mathbf{D}^\top (\mathbf{X} - \mathbf{DR}) \\
-    \mathbf{D} \leftarrow \mathrm{sign}(\mathbf{D} - \alpha \nabla_{\mathbf{D}}) \times \mathrm{max}(0,|\mathbf{D} - \alpha \nabla_{\mathbf{D}}| - \alpha) \\
-    \mathbf{R} \leftarrow \mathrm{sign}(\mathbf{R} - \alpha \nabla_{\mathbf{R}}) \times \mathrm{max}(0,|\mathbf{R} - \alpha \nabla_{\mathbf{R}}| - \alpha)$
 
 - KL散度（KL Divergence）非负矩阵分解
   - 损失函数:      
@@ -346,7 +381,7 @@ where $I(\cdot,\cdot$) is the mutual information,$H(\cdot)$ is the entropy.
 我们热烈欢迎您深入我们的源代码并对其做出贡献。
 
 <style>
-    table,th,td {
+    table, th, td {
         border: 1px solid black;
         text-align: center;
     }
@@ -354,537 +389,524 @@ where $I(\cdot,\cdot$) is the mutual information,$H(\cdot)$ is the entropy.
 <table border="1">
     <thead>
         <tr>
-            <th rowspan="2">数据集</th>
-            <th rowspan="2">噪声类型</th>
-            <th rowspan="2">噪声水平</th>
-            <th rowspan="2">指标</th>
-            <th colspan="4">非负矩阵分解算法</th>
+            <th rowspan="2">Dataset</th>
+            <th rowspan="2">Noise Type</th>
+            <th rowspan="2">Noise Level</th>
+            <th rowspan="2">Metrics</th>
+            <th colspan="9">NMF Algorithm</th>
         </tr>
         <tr>
-            <th><i>L<sub>2</sub></i>范数</th>
-            <th><i>L<sub>2,1</sub></i>范数</th>
-            <th>KL散度</th>
-            <th><i>L<sub>1</sub></i>范数正则</th>
+            <th><i>L<sub>2</sub></i> Norm</th>
+            <th>KL Divergence</th>
+            <th><i>L<sub>2,1</sub></i> Norm</th>
+            <th><i>L<sub>1</sub></i> Norm Regularized</th>
+            <th>CappedNorm</th>
         </tr>
     </thead>
     <tbody>
         <tr>
-            <td rowspan="36">ORL</td>
-            <td rowspan="12">均匀</td>
-            <td rowspan="6">0.1</td>
-            <td rowspan="2">均方根误差</td>
-            <td>.1082</td>
-            <td>.1119</td>
-            <td><b>.1079</b></td>
-            <td>.1099</td>
-        </tr>
-        <tr>
-            <td>(<i>.0004</i>)</td>
-            <td>(.0006)</td>
-            <td>(.0006)</td>
-            <td>(.0006)</td>
-        </tr>
-        <tr>
-          <td rowspan="2">平均准确率</td>
-            <td>.5694</td>
-            <td>.5889</td>
-            <td>.5805</td>
-            <td><b>.6367</b></td>
-        </tr>
-        <tr>
-            <td>(.0270)</td>
-            <td>(.0353)</td>
-            <td>(.0241)</td>
-            <td>(<i>.0234</i>)</td>
-        </tr>
-        <tr>
-          <td rowspan="2">标准化互信息</td>
-            <td>.7364</td>
-            <td>.7497</td>
-            <td>.7412</td>
-            <td><b>.7906</b></td>
-        </tr>
-        <tr>
-            <td>(.0252)</td>
-            <td>(.0294)</td>
-            <td>(<i>.0167</i>)</td>
-            <td>(.0183)</td>
-        </tr>
-        <td rowspan="6">0.3</td>
-            <td rowspan="2">均方根误差</td>
-            <td>.2395</td>
-            <td>.2410</td>
-            <td><b>.2388</b></td>
-            <td>.2426</td>
-        </tr>
-        <tr>
-            <td>(<i>.0004</i>)</td>
-            <td>(.0006)</td>
-            <td>(.0006)</td>
-            <td>(.0006)</td>
-        </tr>
-        <tr>
-          <td rowspan="2">平均准确率</td>
-            <td>.5694</td>
-            <td>.5889</td>
-            <td>.5805</td>
-            <td><b>.6367</b></td>
-        </tr>
-        <tr>
-            <td>(.0017)</td>
-            <td>(.0017)</td>
-            <td>(<i>.0017</i>)</td>
-            <td>(.0019)</td>
-        </tr>
-        <tr>
-          <td rowspan="2">标准化互信息</td>
-            <td>.7509</td>
-            <td>.7367</td>
-            <td>.7524</td>
-            <td><b>.7941</b></td>
-        </tr>
-        <tr>
-            <td>(.0120)</td>
-            <td>(.0165)</td>
-            <td>(.0200)</td>
-            <td>(<i>.0113</i>)</td>
-        </tr>
-        <tr>
-            <td rowspan="12">块状</td>
-            <td rowspan="6">10</td>
-            <td rowspan="2">均方根误差</td>
-            <td>.1048</td>
-            <td>.1049</td>
-            <td>.0957</td>
-            <td><b>.0800</b></td>
-        </tr>
-        <tr>
-            <td>(.0004)</td>
-            <td>(.0005)</td>
-            <td>(.0004)</td>
-            <td>(<i>.0003</i>)</td>
-        </tr>
-        <tr>
-          <td rowspan="2">平均准确率</td>
-            <td>.4878</td>
-            <td>.5089</td>
-            <td>.5450</td>
-            <td><b>.5978</b></td>
-        </tr>
-        <tr>
-            <td>(.0236)</td>
-            <td>(.0224)</td>
-            <td>(.0447)</td>
-            <td>(<i>.0077</i>)</td>
-        </tr>
-        <tr>
-          <td rowspan="2">标准化互信息</td>
-            <td>.6647</td>
-            <td>.6938</td>
-            <td>.7074</td>
-            <td><b>.7738</b></td>
-        </tr>
-        <tr>
-            <td>(.0217)</td>
-            <td>(.0178)</td>
-            <td>(.0259)</td>
-            <td>(<i>.0061</i>)</td>
-        </tr>
-        <td rowspan="6">20</td>
-            <td rowspan="2">均方根误差</td>
-            <td>.2062</td>
-            <td>.2039</td>
-            <td>.1931</td>
-            <td><b>.1886</b></td>
-        </tr>
-        <tr>
-            <td>(<i>.0013</i>)</td>
-            <td>(.0016)</td>
-            <td>(.0015)</td>
-            <td>(.0046)</td>
-        </tr>
-        <tr>
-          <td rowspan="2">平均准确率</td>
-            <td>.2466</td>
-            <td>.2833</td>
-            <td><b>.3133</b></td>
-            <td>.2928</td>
-        </tr>
-        <tr>
-            <td>(<i>.0150</i>)</td>
-            <td>(.0017)</td>
-            <td>(.0017)</td>
-            <td>(.0019)</td>
-        </tr>
-        <tr>
-          <td rowspan="2">标准化互信息</td>
-            <td>.4317</td>
-            <td>.4768</td>
-            <td><b>.5037</b></td>
-            <td>.4867</td>
-        </tr>
-        <tr>
-            <td>(.0181)</td>
-            <td>(<i>.0114</i>)</td>
-            <td>(.0231)</td>
-            <td>(.0276)</td>
-        </tr>
-        <tr>
-            <td rowspan="12">椒盐</td>
-            <td rowspan="6">0.02</td>
-            <td rowspan="2">均方根误差</td>
-            <td>.0830</td>
-            <td>.0863</td>
-            <td>.0824</td>
-            <td><b>.0794</b></td>
-        </tr>
-        <tr>
-            <td>(.0003)</td>
-            <td>(.0005)</td>
-            <td>(.0003)</td>
-            <td>(<i>.0003</i>)</td>
-        </tr>
-        <tr>
-          <td rowspan="2">平均准确率</td>
-            <td>.5829</td>
-            <td>.5655</td>
-            <td>.5778</td>
-            <td><b>.6117</b></td>
-        </tr>
-        <tr>
-            <td>(.0420)</td>
-            <td>(.0481)</td>
-            <td>(<i>.0160</i>)</td>
-            <td>(.0196)</td>
-        </tr>
-        <tr>
-          <td rowspan="2">标准化互信息</td>
-            <td>.7496</td>
-            <td>.7444</td>
-            <td>.7446</td>
-            <td><b>.7846</b></td>
-        </tr>
-        <tr>
-            <td>(.0250)</td>
-            <td>(.0392)</td>
-            <td>(.0160)</td>
-            <td>(<i>.0115</i>)</td>
-        </tr>
-        <td rowspan="6">0.1</td>
-            <td rowspan="2">均方根误差</td>
-            <td>.1111</td>
-            <td>.1130</td>
-            <td>.1057</td>
-            <td><b>.0819</b></td>
-        </tr>
-        <tr>
-            <td>(.0006)</td>
-            <td>(.0008)</td>
-            <td>(<i>.0002</i>)</td>
-            <td>(.0008)</td>
-        </tr>
-        <tr>
-          <td rowspan="2">平均准确率</td>
-            <td>.5450</td>
-            <td>.5322</td>
-            <td>.5678</td>
-            <td><b>.6445</b></td>
-        </tr>
-        <tr>
-            <td>(<i>.0150</i>)</td>
-            <td>(.0017)</td>
-            <td>(.0017)</td>
-            <td>(.0019)</td>
-        </tr>
-        <tr>
-          <td rowspan="2">标准化互信息</td>
-            <td>.7379</td>
-            <td>.7316</td>
-            <td>.7360</td>
-            <td><b>.7936</b></td>
-        </tr>
-        <tr>
-            <td>(.0286)</td>
-            <td>(.0272)</td>
-            <td>(<i>.0176</i>)</td>
-            <td>(.0238)</td>
-        </tr>
-        <tr>
-            <td rowspan="42">Cropped YaleB</td>
-            <td rowspan="12">高斯</td>
-            <td rowspan="6">0.1</td>
-            <td rowspan="2">均方根误差</td>
-            <td>.0786</td>
-            <td>.0784</td>
-            <td rowspan="2"> > 3000</td>
-            <td><b>.0775</b></td>
-        </tr>
-        <tr>
-            <td>(.0010)</td>
-            <td>(.0006)</td>
-            <td>(<i>.0002</i>)</td>
-        </tr>
-        <tr>
-          <td rowspan="2">平均准确率</td>
-            <td><b>.1808</b></td>
-            <td>.1769</td>
-            <td>.0592</td>
-            <td>.1466</td>
-        </tr>
-        <tr>
-            <td>(<i>.0073</i>)</td>
-            <td>(.0115)</td>
-            <td>(.0020)</td>
-            <td>(.0078)</td>
-        </tr>
-        <tr>
-          <td rowspan="2">标准化互信息</td>
-            <td><b>.2651</b></td>
-            <td>.2459</td>
-            <td>.0601</td>
-            <td>.2137</td>
-        </tr>
-        <tr>
-            <td>(.0133)</td>
-            <td>(.0163)</td>
-            <td>(<i>.0041</i>)</td>
-            <td>(.0143)</td>
-        </tr>
-        <td rowspan="6">0.3</td>
-            <td rowspan="2">均方根误差</td>
-            <td rowspan="2">> 2</td>
-            <td rowspan="2">> 12</td>
-            <td rowspan="2">> 3000</td>
-            <td><b>.0885</b></td>
-        </tr>
-        <tr>
-            <td><i>(.0017)</i></td>
-        </tr>
-        <tr>
-          <td rowspan="2">平均准确率</td>
-            <td>.0779</td>
-            <td>.0609</td>
-            <td>.0584</td>
-            <td><b>.1352</b></td>
-        </tr>
-        <tr>
-            <td>(.0369)</td>
-            <td>(.0036)</td>
-            <td>(<i>.0033</i>)</td>
-            <td>(.0065)</td>
-        </tr>
-        <tr>
-          <td rowspan="2">标准化互信息</td>
-            <td>.0905</td>
-            <td>.0657</td>
-            <td>.0636</td>
-            <td><b>.1840</b></td>
-        </tr>
-        <tr>
-            <td>(.0681)</td>
-            <td>(.0067)</td>
-            <td>(<i>.0046</i>)</td>
-            <td>(.0122)</td>
-        </tr>
-        <tr>
-            <td rowspan="6">拉普拉斯</td>
-            <td rowspan="6">0.1</td>
-            <td rowspan="2">均方根误差</td>
-            <td>.0766</td>
-            <td>.0759</td>
-            <td rowspan="2">> 6000</td>
-            <td><b>.0735</b></td>
-        </tr>
-        <tr>
-            <td>(.0008)</td>
-            <td>(.0001)</td>
-            <td>(<i>.0001</i>)</td>
-        </tr>
-        <tr>
-          <td rowspan="2">平均准确率</td>
-            <td>.1699</td>
-            <td><b>.1785</b></td>
-            <td>.0585</td>
-            <td>.1463</td>
-        </tr>
-        <tr>
-            <td>(.0189)</td>
-            <td>(.0191)</td>
-            <td>(.0034)</td>
-            <td>(<i>.0010</i>)</td>
-        </tr>
-        <tr>
-          <td rowspan="2">标准化互信息</td>
-            <td>.2509</td>
-            <td><b>.2553</b></td>
-            <td>.0583</td>
-            <td>.2126</td>
-        </tr>
-        <tr>
-            <td>(.0359)</td>
-            <td>(.0250)</td>
-            <td>(<i>.0031</i>)</td>
-            <td>(.0057)</td>
-        </tr>
-        <tr>
-            <td rowspan="12">块状</td>
-            <td rowspan="6">10</td>
-            <td rowspan="2">均方根误差</td>
-            <td>.1720</td>
-            <td>.1702</td>
-            <td>.01567</td>
-            <td><b>.1097</b></td>
-        </tr>
-        <tr>
-            <td>(.0008)</td>
-            <td>(.0008)</td>
-            <td>(<i>.0006</i>)</td>
-            <td>(.0108)</td>
-        </tr>
-        <tr>
-          <td rowspan="2">平均准确率</td>
-            <td>.0924</td>
-            <td>.1004</td>
-            <td>.1108</td>
-            <td><b>.1202</b></td>
-        </tr>
-        <tr>
-            <td>(.0054)</td>
-            <td>(.0039)</td>
-            <td>(.0084)</td>
-            <td>(<i>.0024</i>)</td>
-        </tr>
-        <tr>
-          <td rowspan="2">标准化互信息</td>
-            <td>.1034</td>
-            <td>.1156</td>
-            <td>.1352</td>
-            <td><b>.1551</b></td>
-        </tr>
-        <tr>
-            <td>(0099)</td>
-            <td>(.0110)</td>
-            <td>(<i>..0090</i>)</td>
-            <td>(.0134)</td>
-        </tr>
-        <td rowspan="6">20</td>
-            <td rowspan="2">均方根误差</td>
-            <td>.3626</td>
-            <td>.3603</td>
-            <td>.3576</td>
-            <td><b>.3519</b></td>
-        </tr>
-        <tr>
-            <td>(<i>.0009</i>)</td>
-            <td>(.0011)</td>
-            <td>(.0011)</td>
-            <td>(.0082)</td>
-        </tr>
-        <tr>
-          <td rowspan="2">平均准确率</td>
-            <td>.0796</td>
-            <td>.0796</td>
-            <td><b>.0833</b></td>
-            <td>.0806</td>
-        </tr>
-        <tr>
-            <td>(<i>.0020</i>)</td>
-            <td>(.0043)</td>
-            <td>(.0032)</td>
-            <td>(.0034)</td>
-        </tr>
-        <tr>
-          <td rowspan="2">标准化互信息</td>
-            <td>.1043</td>
-            <td>.1156</td>
-            <td><b>.1352</b></td>
-            <td>.1551</td>
-        </tr>
-        <tr>
-            <td>(.0006)</td>
-            <td>(<i>.0003</i>)</td>
-            <td>(.0005)</td>
-            <td>(.0015)</td>
-        </tr>
-        <tr>
-            <td rowspan="12">椒盐</td>
-            <td rowspan="6">0.02</td>
-            <td rowspan="2">均方根误差</td>
-            <td>.0743</td>
-            <td>.0749</td>
-            <td>.0792</td>
-            <td><b>.0723</b></td>
-        </tr>
-        <tr>
-            <td>(.0006)</td>
-            <td>(<i>.0003</i>)</td>
-            <td>(.0005)</td>
-            <td>(.0015)</td>
-        </tr>
-        <tr>
-          <td rowspan="2">平均准确率</td>
-            <td>.1927</td>
-            <td><b>.1994</b></td>
-            <td>.1852</td>
-            <td>.1416</td>
-        </tr>
-        <tr>
-            <td>(<i>.0051</i>)</td>
-            <td>(.0218)</td>
-            <td>(.0167)</td>
-            <td>(.0113)</td>
-        </tr>
-        <tr>
-          <td rowspan="2">标准化互信息</td>
-            <td>.2688</td>
-            <td><b>.2701</b></td>
-            <td>.2665</td>
-            <td>.2037</td>
-        </tr>
-        <tr>
-            <td>(<i>.0098</i>)</td>
-            <td>(.0175)</td>
-            <td>(.0272)</td>
-            <td>(.0120)</td>
-        </tr>
-        <td rowspan="6">0.1</td>
-            <td rowspan="2">均方根误差</td>
-            <td>.1271</td>
-            <td>.1227</td>
-            <td>.1106</td>
-            <td><b>.0728</b></td>
-        </tr>
-        <tr>
-            <td>(.0082)</td>
-            <td>(.0018)</td>
-            <td>(<i>.0009</i>)</td>
-            <td>(.0015)</td>
-        </tr>
-        <tr>
-          <td rowspan="2">平均准确率</td>
-            <td>.1418</td>
-            <td>.1312</td>
-            <td><b>.1592</b></td>
-            <td>.1411</td>
-        </tr>
-        <tr>
-            <td>(.0082)</td>
-            <td>(.0018)</td>
-            <td>(<i>.0009</i>)</td>
-            <td>(.0015)</td>
-        </tr>
-        <tr>
-          <td rowspan="2">标准化互信息</td>
-            <td>.1851</td>
-            <td>.1898</td>
-            <td><b>.2248</b></td>
-            <td>.2078</td>
-        </tr>
-        <tr>
-            <td>(.0268)</td>
-            <td>(.0197)</td>
-            <td>(<i>.0133</i>)</td>
-            <td>(.0220)</td>
+            <td rowspan="30">ORL</td>
+            <td rowspan="6">Uniform</td>
+            <td rowspan="3">0.1</td>
+            <td>RMSE</td>
+            <td>.1112(.0005)</td>
+            <td>.1108(.0005)</td>
+            <td>.1116(.0004)</td>
+            <td>.1125(.0006)</td>
+            <td>.2617(.0035)</td>
+        </tr>
+        <tr>
+            <td>Accuracy</td>
+            <td>.6111(.0394)</td>
+            <td>.5911(.0424)</td>
+            <td>.5956(.0458)</td>
+            <td>.6806(.0275)</td>
+            <td>.6883(.0262)</td>
+        </tr>
+        <tr>
+            <td>NMI</td>
+            <td>.7696(.0244)</td>
+            <td>.7580(.0320)</td>
+            <td>.7633(.0295)</td>
+            <td>.8210(.0155)</td>
+            <td>.8316(.0120)</td>
+        </tr>
+        <tr>
+            <td rowspan="3">0.3</td>
+            <td>RMSE</td>
+            <td>.2410(.0017)</td>
+            <td>.2403(.0018)</td>
+            <td>.2411(.0018)</td>
+            <td>.2447(.0019)</td>
+            <td>.1569(.0011)</td>
+        </tr>
+        <tr>
+            <td>Accuracy</td>
+            <td>.5661(.0126)</td>
+            <td>.5650(.0345)</td>
+            <td>.5461(.0201)</td>
+            <td>.6478(.0168)</td>
+            <td>.6639(.0182)</td>
+        </tr>
+        <tr>
+            <td>NMI</td>
+            <td>.7450(.0061)</td>
+            <td>.7353(.0316)</td>
+            <td>.7540(.0262)</td>
+            <td>.8051(.0143)</td>
+            <td>.8170(.0095)</td>
+        </tr>
+        <td rowspan="6">Gaussian</td>
+            <td rowspan="3">0.05</td>
+            <td>RMSE</td>
+            <td>.1119(.0140)</td>
+            <td>.1116(.0139)</td>
+            <td>.1121(.0140)</td>
+            <td>.1139(.0139)</td>
+            <td>.2699(.0182)</td>
+        </tr>
+        <tr>
+            <td>Accuracy</td>
+            <td>.5683(.0116)</td>
+            <td>.5494(.0332)</td>
+            <td>.5983(.0472)</td>
+            <td>.6750(.0393)</td>
+            <td>.6889(.0283)</td>
+        </tr>
+        <tr>
+            <td>NMI</td>
+            <td>.7372(.0073)</td>
+            <td>.7249(.0233)</td>
+            <td>.7540(.0262)</td>
+            <td>.8153(.0264)</td>
+            <td>.8306(.0131)</td>
+        </tr>
+        <tr>
+            <td rowspan="3">0.08</td>
+            <td>RMSE</td>
+            <td>.2255(.0380)</td>
+            <td>.2249(.0380)</td>
+            <td>.2256(.0380)</td>
+            <td>.2278(.0377)</td>
+            <td>.1710(.0255)</td>
+        </tr>
+        <tr>
+            <td>Accuracy</td>
+            <td>.5706(.0377)</td>
+            <td>.5767(.0364)</td>
+            <td>.5750(.0434)</td>
+            <td>.6389(.0316)</td>
+            <td>.6717(.0366)</td>
+        </tr>
+        <tr>
+            <td>NMI</td>
+            <td>.7519(.0212)</td>
+            <td>.7454(.0209)</td>
+            <td>.7519(.0341)</td>
+            <td>.7965(.0225)</td>
+            <td>.8089(.0176)</td>
+        </tr>
+        <td rowspan="6">Laplcian</td>
+            <td rowspan="3">0.04</td>
+            <td>RMSE</td>
+            <td>.1113(.0085)</td>
+            <td>.1110(.0084)</td>
+            <td>.1117(.0085)</td>
+            <td>.1125(.0083)</td>
+            <td>.2642(.0135)</td>
+        </tr>
+        <tr>
+            <td>Accuracy</td>
+            <td>.6050(.0296)</td>
+            <td>.5783(.0245)</td>
+            <td>.5983(.0190)</td>
+            <td>.6817(.0257)</td>
+            <td>.7044(.0138)</td>
+        </tr>
+        <tr>
+            <td>NMI</td>
+            <td>.7719(.0212)</td>
+            <td>.7482(.0199)</td>
+            <td>.7688(.0161)</td>
+            <td>.8184(.0137)</td>
+            <td>.8329(.0083)</td>
+        </tr>
+        <tr>
+            <td rowspan="3">0.06</td>
+            <td>RMSE</td>
+            <td>.2496(.0488)</td>
+            <td>.2491(.0488)</td>
+            <td>.2497(.0488)</td>
+            <td>.2505(.0486)</td>
+            <td>.1464(.0351)</td>
+        </tr>
+        <tr>
+            <td>Accuracy</td>
+            <td>.5700(.0427)</td>
+            <td>.5967(.0316)</td>
+            <td>.6083(.0578)</td>
+            <td>.6783(.0187)</td>
+            <td>.7050(.0265)</td>
+        </tr>
+        <tr>
+            <td>NMI</td>
+            <td>.7463(.0148)</td>
+            <td>.7600(.0275)</td>
+            <td>.7681(.0377)</td>
+            <td>.8208(.0066)</td>
+            <td>.8329(.0107)</td>
+        </tr>
+        <td rowspan="6">Salt and Pepper</td>
+            <td rowspan="3">0.02</td>
+            <td>RMSE</td>
+            <td>.0859(.0005)</td>
+            <td>.0856(.0003)</td>
+            <td>.0864(.0004)</td>
+            <td>.0823(.0003)</td>
+            <td>.3253(.0037)</td>
+        </tr>
+        <tr>
+            <td>Accuracy</td>
+            <td>.5683(.0172)</td>
+            <td>.5833(.0315)</td>
+            <td>.5867(.0322)</td>
+            <td>.6689(.0180)</td>
+            <td>.7056(.0322)</td>
+        </tr>
+        <tr>
+            <td>NMI</td>
+            <td>.7463(.0148)</td>
+            <td>.7427(.0163)</td>
+            <td>.7521(.0230)</td>
+            <td>.8116(.0050)</td>
+            <td>.8394(.0134)</td>
+        </tr>
+        <tr>
+            <td rowspan="3">0.1</td>
+            <td>RMSE</td>
+            <td>.1141(.0016)</td>
+            <td>.1100(.0013)</td>
+            <td>.1142(.0017)</td>
+            <td>.0920(.0017)</td>
+            <td>.2941(.0044)</td>
+        </tr>
+        <tr>
+            <td>Accuracy</td>
+            <td>.5178(.0434)</td>
+            <td>.5356(.0306)</td>
+            <td>.5033(.0487)</td>
+            <td>.6306(.0288)</td>
+            <td>.5850(.0257)</td>
+        </tr>
+        <tr>
+            <td>NMI</td>
+            <td>.7244(.0221)</td>
+            <td>.7242(.0193)</td>
+            <td>.7166(.0318)</td>
+            <td>.8016(.0182)</td>
+            <td>.7828(.0113)</td>
+        </tr>
+        <td rowspan="6">Block</td>
+            <td rowspan="3">10</td>
+            <td>RMSE</td>
+            <td>.1064(.0007)</td>
+            <td>.0989(.0005)</td>
+            <td>.1056(.0007)</td>
+            <td>.0828(.0003)</td>
+            <td>.3276(.0030)</td>
+        </tr>
+        <tr>
+            <td>Accuracy</td>
+            <td>.4472(.0354)</td>
+            <td>.4961(.0359)</td>
+            <td>.4772(.0299)</td>
+            <td>.6606(.0271)</td>
+            <td>.6261(.0172)</td>
+        </tr>
+        <tr>
+            <td>NMI</td>
+            <td>.6381(.0283)</td>
+            <td>.6744(.0323)</td>
+            <td>.6673(.0299)</td>
+            <td>.8116(.0132)</td>
+            <td>.7721(.0061)</td>
+        </tr>
+        <tr>
+            <td rowspan="3">15</td>
+            <td>RMSE</td>
+            <td>.1531(.0019)</td>
+            <td>.1390(.0021)</td>
+            <td>.1517(.0019)</td>
+            <td>.1104(.0052)</td>
+            <td>.3401(.0018)</td>
+        </tr>
+        <tr>
+            <td>Accuracy</td>
+            <td>.3633(.0161)</td>
+            <td>.4150(.0511)</td>
+            <td>.3656(.0349)</td>
+            <td>.5783(.0282)</td>
+            <td>.3028(.0228)</td>
+        </tr>
+        <tr>
+            <td>NMI</td>
+            <td>.5528(.0208)</td>
+            <td>.6101(.0335)</td>
+            <td>.5627(.0314)</td>
+            <td>.7513(.0200)</td>
+            <td>.4863(.0256)</td>
+        </tr>
+        <tr>
+            <td rowspan="30">YaleB</td>
+            <td rowspan="6">Uniform</td>
+            <td rowspan="3">0.1</td>
+            <td>RMSE</td>
+            <td>.1232(.0005)</td>
+            <td>.1227(.0004)</td>
+            <td>.1235(.0005)</td>
+            <td>.1235(.0004)</td>
+            <td>.1044(.0003)</td>
+        </tr>
+        <tr>
+            <td>Accuracy</td>
+            <td>.1878(.0102)</td>
+            <td>.1899(.0055)</td>
+            <td>.1890(.0089)</td>
+            <td>.1562(.0040)</td>
+            <td>.1632(.0066)</td>
+        </tr>
+        <tr>
+            <td>NMI</td>
+            <td>.2674(.0154)</td>
+            <td>.2586(.0124)</td>
+            <td>.2599(.0135)</td>
+            <td>.2399(.0136)</td>
+            <td>.2064(.0137)</td>
+        </tr>
+        <tr>
+            <td rowspan="3">0.3</td>
+            <td>RMSE</td>
+            <td>.3102(.0014)</td>
+            <td>.3089(.0015)</td>
+            <td>.3100(.0015)</td>
+            <td>.3128(.0016)</td>
+            <td>.2571(.0348)</td>
+        </tr>
+        <tr>
+            <td>Accuracy</td>
+            <td>.1641(.0307)</td>
+            <td>.1819(.0265)</td>
+            <td>.1706(.0300)</td>
+            <td>.1316(.0086)</td>
+            <td>.1327(.0097)</td>
+        </tr>
+        <tr>
+            <td>NMI</td>
+            <td>.2382(.0404)</td>
+            <td>.2551(.0333)</td>
+            <td>.2458(.0363)</td>
+            <td>.1682(.0205)</td>
+            <td>.1573(.0215)</td>
+        </tr>
+        <td rowspan="6">Gaussian</td>
+            <td rowspan="3">0.05</td>
+            <td>RMSE</td>
+            <td>1.1221(.3938)</td>
+            <td>1.1219(.3938)</td>
+            <td>1.1221(.3938)</td>
+            <td>1.1216(.3936)</td>
+            <td>1.1160(.3902)</td>
+        </tr>
+        <tr>
+            <td>Accuracy</td>
+            <td>.1334(.0264)</td>
+            <td>.1362(.0264)</td>
+            <td>.1359(.0244)</td>
+            <td>.1174(.0135)</td>
+            <td>.1276(.0133)</td>
+        </tr>
+        <tr>
+            <td>NMI</td>
+            <td>.1922(.0511)</td>
+            <td>.1865(.0492)</td>
+            <td>.1840(.0581)</td>
+            <td>.1357(.0344)</td>
+            <td>.1416(.0134)</td>
+        </tr>
+        <tr>
+            <td rowspan="3">0.08</td>
+            <td>RMSE</td>
+            <td>3.0621(.9219)</td>
+            <td>3.0620(.9220)</td>
+            <td>3.0621(.9219)</td>
+            <td>3.0583(.9171)</td>
+            <td>2.9515(.9138)</td>
+        </tr>
+        <tr>
+            <td>Accuracy</td>
+            <td>.0864(.0965)</td>
+            <td>.0855(.0146)</td>
+            <td>.0843(.0151)</td>
+            <td>.0843(.0105)</td>
+            <td>.0877(.0126)</td>
+        </tr>
+        <tr>
+            <td>NMI</td>
+            <td>.0965(.0396)</td>
+            <td>.0925(.0338)</td>
+            <td>.0956(.0361)</td>
+            <td>.0775(.0146)</td>
+            <td>.0794(.0192)</td>
+        </tr>
+        <td rowspan="6">Laplcian</td>
+            <td rowspan="3">0.04</td>
+            <td>RMSE</td>
+            <td>1.6705(.6822)</td>
+            <td>1.6703(.6822)</td>
+            <td>1.6705(.6822)</td>
+            <td>1.6692(.6817)</td>
+            <td>1.6707(.6771)</td>
+        </tr>
+        <tr>
+            <td>Accuracy</td>
+            <td>.1208(.0261)</td>
+            <td>.1197(.0262)</td>
+            <td>.1188(.0294)</td>
+            <td>.1017(.0169)</td>
+            <td>.1166(.0123)</td>
+        </tr>
+        <tr>
+            <td>NMI</td>
+            <td>.1649(.0569)</td>
+            <td>.1667(.0407)</td>
+            <td>.1564(.0499)</td>
+            <td>.1175(.0443)</td>
+            <td>.1214(.0208)</td>
+        </tr>
+        <tr>
+            <td rowspan="3">0.06</td>
+            <td>RMSE</td>
+            <td>4.3538(1.5452)</td>
+            <td>4.3537(1.5452)</td>
+            <td>4.3538(1.5452)</td>
+            <td>4.3414(1.5343)</td>
+            <td>4.2264(1.5424)</td>
+        </tr>
+        <tr>
+            <td>Accuracy</td>
+            <td>.0739(.0091)</td>
+            <td>.0720(.0083)</td>
+            <td>.0727(.0080)</td>
+            <td>.0959(.0134)</td>
+            <td>.0855(.0119)</td>
+        </tr>
+        <tr>
+            <td>NMI</td>
+            <td>.0658(.0259)</td>
+            <td>.0638(.0263)</td>
+            <td>.0602(.0174)</td>
+            <td>.0988(.0181)</td>
+            <td>.0764(.0193)</td>
+        </tr>
+        <td rowspan="6">Salt and Pepper</td>
+            <td rowspan="3">0.02</td>
+            <td>RMSE</td>
+            <td>.0749(.0004)</td>
+            <td>.0765(.0004)</td>
+            <td>.0749(.0003)</td>
+            <td>.0738(.0002)</td>
+            <td>.1495(.0005)</td>
+        </tr>
+        <tr>
+            <td>Accuracy</td>
+            <td>.1903(.0091)</td>
+            <td>.1852(.0106)</td>
+            <td>.1959(.0139)</td>
+            <td>.1575(.0055)</td>
+            <td>.1730(.0070)</td>
+        </tr>
+        <tr>
+            <td>NMI</td>
+            <td>.2705(.0154)</td>
+            <td>.2556(.0113)</td>
+            <td>.2736(.0329)</td>
+            <td>.2436(.0135)</td>
+            <td>.2228(.0166)</td>
+        </tr>
+        <tr>
+            <td rowspan="3">0.1</td>
+            <td>RMSE</td>
+            <td>.1213(.0020)</td>
+            <td>.1100(.0009)</td>
+            <td>.1214(.0018)</td>
+            <td>.0779(.0026)</td>
+            <td>.1467(.0238)</td>
+        </tr>
+        <tr>
+            <td>Accuracy</td>
+            <td>.1365(.0082)</td>
+            <td>.1565(.0047)</td>
+            <td>.1313(.0050)</td>
+            <td>.1506(.0061)</td>
+            <td>.1308(.0108)</td>
+        </tr>
+        <tr>
+            <td>NMI</td>
+            <td>.1971(.0151)</td>
+            <td>.2115(.0163)</td>
+            <td>.1750(.0114)</td>
+            <td>.2217(.0101)</td>
+            <td>.1586(.0106)</td>
+        </tr>
+        <td rowspan="6">Block</td>
+            <td rowspan="3">10</td>
+            <td>RMSE</td>
+            <td>.1717(.0009)</td>
+            <td>.1560(.0006)</td>
+            <td>.1706(.0007)</td>
+            <td>.1124(.0060)</td>
+            <td>.1854(.0126)</td>
+        </tr>
+        <tr>
+            <td>Accuracy</td>
+            <td>.0994(.0072)</td>
+            <td>.1123(.0118)</td>
+            <td>.0917(.0035)</td>
+            <td>.1210(.0113)</td>
+            <td>.0941(.0079)</td>
+        </tr>
+        <tr>
+            <td>NMI</td>
+            <td>.1055(.0070)</td>
+            <td>.1256(.0106)</td>
+            <td>.0947(.0042)</td>
+            <td>.1730(.0160)</td>
+            <td>.0963(.0090)</td>
+        </tr>
+        <tr>
+            <td rowspan="3">15</td>
+            <td>RMSE</td>
+            <td>.2669(.0013)</td>
+            <td>.2594(.0014)</td>
+            <td>.2664(.0013)</td>
+            <td>.2540(.0010)</td>
+            <td>.2542(.0069)</td>
+        </tr>
+        <tr>
+            <td>Accuracy</td>
+            <td>.0813(.0029)</td>
+            <td>.0948(.0047)</td>
+            <td>.0846(.0058)</td>
+            <td>.0766(.0038)</td>
+            <td>.0811(.0017)</td>
+        </tr>
+        <tr>
+            <td>NMI</td>
+            <td>.0748(.0080)</td>
+            <td>.1068(.0133)</td>
+            <td>.0845(.0170)</td>
+            <td>.0731(.0079)</td>
+            <td>.0747(.0021)</td>
         </tr>
     </tbody>
 </table>
@@ -937,11 +959,7 @@ where $I(\cdot,\cdot$) is the mutual information,$H(\cdot)$ is the entropy.
 │   ├── algorithm/
 │   │   ├── __init__.py
 │   │   ├── datasets.py
-│   │   ├── decomposition.py
-│   │   ├── evaluations.py
-│   │   ├── intialization.py
-│   │   ├── label.py
-│   │   ├── NMF.py
+│   │   ├── nmf.py
 │   │   ├── pipeline.py
 │   │   ├── preprocess.py
 │   │   ├── sample.py
@@ -961,10 +979,17 @@ where $I(\cdot,\cdot$) is the mutual information,$H(\cdot)$ is the entropy.
 └── run.py
 ```
 
-## 8. TODO
-- NumPy内存预分配
-- 算法故障原因
-- GUI界面
+## 8. 更新日志 & TODO清单
+- 2023-10-20      
+  - TODO清单:
+    - NumPy内存预分配
+    - 算法故障原因
+    - GUI界面
+- 2023-11-10
+  - 更新日志:
+    - 提升`algorithm.NMF`模块
+    - 修复部分算法故障
+
 
 ## 9. :handshake: 贡献
 我们欢迎任何形式的贡献，无论是提出新功能的建议，报告bug，还是帮助优化代码。以下是开始的步骤：

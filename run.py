@@ -2,7 +2,7 @@ import argparse
 from algorithm.pipeline import Pipeline
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--nmf', type=str, help='NMF Algorithm. Options: L2NormNMF, L1NormNMF, KLdivergenceNMF, ISdivergenceNMF, RobustNMF, HypersurfaceNMF, L1NormRegularizedNMF, CappedNormNMF, CauchyNMF', default='L1NormRegularizedNMF')
+parser.add_argument('--nmf', type=str, help='NMF Algorithm. Options: L2NormNMF, KLDvergenceNMF, ISDivergenceNMF, L21NormNMF, HSCostNMF, L1NormRegularizedNMF, CappedNormNMF, CauchyNMF', default='L1NormRegularizedNMF')
 parser.add_argument('--dataset', type=str, help='Dataset. Options: ORL, YaleB', default='YaleB')
 parser.add_argument('--reduce', type=int, help='Reduce. Options: 1, 3', default=3)
 parser.add_argument('--noise_type', type=str, help='Noise type. Options: uniform, gaussian, laplacian, salt_and_pepper, block', default='salt_and_pepper')

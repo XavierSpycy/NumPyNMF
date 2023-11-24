@@ -1,18 +1,81 @@
-# nmf, random_state, noise_type, max_iter
 import numpy as np
+import pandas as pd
 from algorithm.datasets import load_data, get_image_size
 from algorithm.preprocess import NoiseAdder, MinMaxScaler, StandardScaler
 from algorithm.sample import random_sample
-from algorithm.NMF import L2NormNMF, L1NormNMF, KLDivergenceNMF, ISDivergenceNMF, RobustNMF, HypersurfaceNMF, L1NormRegularizedNMF, CappedNormNMF, CauchyNMF
+from algorithm.nmf import BasicNMF, L2NormNMF, KLDivergenceNMF, ISDivergenceNMF, L21NormNMF, HSCostNMF, L1NormRegularizedNMF, CappedNormNMF, CauchyNMF
 from algorithm.user_evaluate import evaluate
+from typing import Union
 
-class Pipeline:
-    def __init__(self, nmf: str, dataset: str='ORL', reduce: int=1, noise_type: str='uniform', noise_level: float=0.02, random_state: int=3407, scaler: str='MinMax') -> None:
+class BasicBlock(object):
+    def basic_info(self, nmf, dataset, scaler):
+        nmf_dict = {
+                'L2NormNMF': L2NormNMF,
+                'KLDivergenceNMF': KLDivergenceNMF,
+                'ISDivergenceNMF': ISDivergenceNMF,
+                'L21NormNMF': L21NormNMF,
+                'HSCostNMF': HSCostNMF,
+                'L1NormRegularizedNMF': L1NormRegularizedNMF,
+                'CappedNormNMF': CappedNormNMF,
+                'CauchyNMF': CauchyNMF
+        }
+        # Store NMF algorithms in a dictionary
+        dataset_dict = {
+                'ORL': 'data/ORL',
+                'YaleB': 'data/CroppedYaleB'
+        }
+
+        scaler_dict = {
+                'MinMax': MinMaxScaler(),
+                'Standard': StandardScaler()
+        }
+        folder = dataset_dict.get(dataset, 'data/ORL')
+        # Scale the data
+        scaler = scaler_dict.get(scaler, 'MinMax')
+        if isinstance(nmf, BasicNMF):
+            nmf = nmf
+        else:
+             # Choose an NMF algorithm
+            nmf = nmf_dict.get(nmf, L1NormRegularizedNMF)()
+        return folder, scaler, nmf
+    
+    def load_data(self, folder, reduce=1, random_state=None):
+        # Load ORL dataset
+        X_hat, Y_hat = load_data(folder, reduce=reduce)
+        # Randomly sample 90% of the data
+        X_hat, Y_hat = random_sample(X_hat, Y_hat, 0.9, random_state=random_state)
+        # Get the size of images
+        img_size = get_image_size(folder)
+        return X_hat, Y_hat, img_size
+    
+    def add_noise(self, X_hat, noise_type, noise_level, random_state, reduce=1):
+        # set random state and noise adder
+        noise_adder = NoiseAdder(random_state=random_state)
+        noise_dict = {
+                'uniform': (noise_adder.add_uniform_noise, {'X_hat': X_hat, 'noise_level': noise_level}),
+                'gaussian': (noise_adder.add_gaussian_noise, {'X_hat': X_hat, 'noise_level': noise_level}),
+                'laplacian': (noise_adder.add_laplacian_noise, {'X_hat': X_hat, 'noise_level': noise_level}),
+                'salt_and_pepper': (noise_adder.add_salt_and_pepper_noise, {'X_hat': X_hat, 'noise_level': noise_level}),
+                'block': (noise_adder.add_block_noise, {'X_hat': X_hat, 'block_size': noise_level, 'img_width': self.img_size[0]//reduce})
+        }
+        noise_func, args = noise_dict.get(noise_type, (noise_adder.add_uniform_noise, {'X_hat': X_hat, 'noise_level': noise_level}))
+        _, X_noise = noise_func(**args)
+        return X_noise
+    
+    def scale(self, X_hat, X_noise, scaler):
+        # Scale the data
+        X_hat_scaled = scaler.fit_transform(X_hat)
+        X_noise_scaled = scaler.transform(X_noise)
+        X_noise_scaled += np.abs(np.min(X_noise_scaled)) * np.abs(np.min(X_noise_scaled)) * int(np.min(X_noise_scaled) < 0)
+        return X_hat_scaled, X_noise_scaled
+
+class Pipeline(BasicBlock):
+    def __init__(self, nmf: Union[str, BasicNMF], dataset: str='ORL', reduce: int=1, noise_type: str='uniform', noise_level: float=0.02, random_state: int=3407, scaler: str='MinMax') -> None:
         """
         Initialize the pipeline.
 
         Parameters:
-        - nmf (str): Name of the NMF algorithm to use.
+        - nmf (str or BasicNMF): Name of the NMF algorithm to use.
         - dataset (str): Name of the dataset to use.
         - reduce (int): Factor by which the image size is reduced for visualization.
         - noise_type (str): Type of noise to add to the data.
@@ -23,55 +86,10 @@ class Pipeline:
         Returns:
         None. The function will initialize the pipeline.
         """
-        # Store NMF algorithms in a dictionary
-        self.nmf_dict = {
-                'L2NormNMF': L2NormNMF,
-                'L1NormNMF': L1NormNMF,
-                'KLdivergenceNMF': KLDivergenceNMF,
-                'ISdivergenceNMF': ISDivergenceNMF,
-                'RobustNMF': RobustNMF,
-                'HypersurfaceNMF': HypersurfaceNMF,
-                'L1NormRegularizedNMF': L1NormRegularizedNMF,
-                'CappedNormNMF': CappedNormNMF,
-                'CauchyNMF': CauchyNMF
-        }
-
-        dataset_dict = {
-                'ORL': 'data/ORL',
-                'YaleB': 'data/CroppedYaleB'
-        }
-
-        scaler_dict = {
-                'MinMax': MinMaxScaler(),
-                'Standard': StandardScaler()
-        }
-
-        folder = dataset_dict.get(dataset, 'data/ORL')
-        # Load ORL dataset
-        X_hat, self.__Y_hat = load_data(folder, reduce=reduce)
-        # Randomly sample 90% of the data
-        X_hat, self.__Y_hat = random_sample(X_hat, self.__Y_hat, 0.9, random_state=random_state)
-        # Get the size of images
-        self.img_size = get_image_size(folder)
-        # set random state and noise adder
-        noise_adder = NoiseAdder(random_state=random_state)
-
-        # Scale the data
-        scaler = scaler_dict.get(scaler, 'MinMax')
-        self.__X_hat_scaled = scaler.fit_transform(X_hat)
-        # Add noise
-        noise_dict = {
-                'uniform': (noise_adder.add_uniform_noise, {'X_hat': X_hat, 'noise_level': noise_level}),
-                'gaussian': (noise_adder.add_gaussian_noise, {'X_hat': X_hat, 'noise_level': noise_level}),
-                'laplacian': (noise_adder.add_laplacian_noise, {'X_hat': X_hat, 'noise_level': noise_level}),
-                'salt_and_pepper': (noise_adder.add_salt_and_pepper_noise, {'X_hat': X_hat, 'noise_level': noise_level}),
-                'block': (noise_adder.add_block_noise, {'X_hat': X_hat, 'block_size': noise_level, 'img_width': self.img_size[0]//reduce})
-        }
-        noise_func, args = noise_dict.get(noise_type, (noise_adder.add_uniform_noise, {'X': X_hat, 'noise_level': noise_level}))
-        _, X_noise = noise_func(**args)
-        X_noise_scaled = scaler.transform(X_noise)
-        self.__X_noise_scaled = X_noise_scaled + np.abs(np.min(X_noise_scaled)) * np.abs(np.min(X_noise_scaled)) * int(np.min(X_noise_scaled) < 0)
-        self.nmf = nmf
+        folder, scaler, self.nmf = self.basic_info(nmf, dataset, scaler)
+        X_hat, self.__Y_hat, self.img_size = self.load_data(folder, reduce=reduce, random_state=random_state)
+        X_noise = self.add_noise(X_hat, noise_type, noise_level, random_state, reduce)
+        self.__X_hat_scaled, self.__X_noise_scaled = self.scale(X_hat, X_noise, scaler)
         self.reduce = reduce
         self.random_state = random_state
 
@@ -88,13 +106,87 @@ class Pipeline:
         Returns:
         None. The function will run the pipeline.
         """
-        # Choose an NMF
-        nmf = self.nmf_dict.get(self.nmf, 'L1NormRegularizedNMF')()
-        nmf.fit(self.__X_noise_scaled, len(set(self.__Y_hat)), max_iter=max_iter, random_state=self.random_state, imshow=convergence_trend, verbose=verbose)
         # Run NMF
-        self.D, self.R = nmf.D, nmf.R
+        self.nmf.fit(self.__X_noise_scaled, len(set(self.__Y_hat)), max_iter=max_iter, 
+                     random_state=self.random_state, imshow=convergence_trend, verbose=verbose)
+        # Get the dictionary and representation matrices
+        self.D, self.R = self.nmf.D, self.nmf.R
         if matrix_size:
             print('D.shape={}, R.shape={}'.format(self.D.shape, self.R.shape))
+        self.metrics = self.nmf.evaluate(self.__X_hat_scaled, self.__Y_hat, random_state=self.random_state)
+        return self.metrics
 
     def evaluate(self, idx=2, imshow=False):
-        evaluate(self.__X_hat_scaled, self.D, self.R, self.__Y_hat, self.__X_noise_scaled, image_size=self.img_size, reduce=self.reduce, random_state=self.random_state, idx=idx, imshow=imshow)
+        evaluate(self.nmf, self.metrics, self.__X_hat_scaled, self.__X_noise_scaled, 
+                self.img_size, self.reduce, idx, imshow)
+
+class Experiment(BasicBlock):
+    def __init__(self, seeds=[0, 42, 99, 512, 3407]):
+        self.seeds = seeds
+
+    def one_type_one_level(self, nmf, dataset, reduce, noise_type, noise_level, scaler_='MinMax', max_iter=500, summary_only=True):
+        df = pd.DataFrame(columns=['dataset', 'noise type', 'noise level', 'seed', 'rmse', 'acc', 'nmi'])
+        for seed in self.seeds:
+            pipeline = Pipeline(nmf, dataset, reduce, noise_type, noise_level, seed, scaler_)
+            rmse, acc, nmi = pipeline.run(max_iter=max_iter)
+            """folder, scaler, self.nmf = self.basic_info(nmf, dataset, scaler_)
+            X_hat, Y_hat, self.img_size = self.load_data(folder, reduce=reduce, random_state=seed)
+            X_noise = self.add_noise(X_hat, noise_type, noise_level, seed, reduce)
+            X_hat_scaled, X_noise_scaled = self.scale(X_hat, X_noise, scaler)
+            self.reduce = reduce
+            self.nmf.fit(X_noise_scaled, len(set(Y_hat)), max_iter=max_iter, random_state=seed, imshow=False, verbose=False)
+            rmse, acc, nmi = self.nmf.evaluate(X_hat_scaled, Y_hat, random_state=seed)"""
+            result = pd.DataFrame({'dataset': dataset, 'noise type': noise_type, 'noise level': noise_level, 
+                                   'seed': seed, 'rmse': rmse, 'acc': acc, 'nmi': nmi}, index=[0])
+            df = pd.concat([df, result], ignore_index=True)
+        avg = pd.DataFrame({'dataset': dataset, 'noise type': noise_type, 'noise level': noise_level,
+                            'seed': 'avg', 'rmse': df.rmse.mean(), 'acc': df.acc.mean(), 'nmi': df.nmi.mean()}, index=[0])
+        std = pd.DataFrame({'dataset': dataset, 'noise type': noise_type, 'noise level': noise_level,
+                            'seed': 'std', 'rmse': df.rmse.std(), 'acc': df.acc.std(), 'nmi': df.nmi.std()}, index=[0])
+        if summary_only:
+            df = pd.concat([avg, std], ignore_index=True)
+        else:
+            df = pd.concat([df, avg, std], ignore_index=True)
+        df[['rmse', 'acc', 'nmi']] = df[['rmse', 'acc', 'nmi']].round(4)
+        return df
+    
+    def one_type_multi_levels(self, nmf, dataset, reduce, noise_type, scaler_='MinMax', max_iter=500, summary_only=True):
+        df = pd.DataFrame(columns=['dataset', 'noise type', 'noise level', 'seed', 'rmse', 'acc', 'nmi'])
+        if noise_type == 'uniform':
+            noise_levels = [0.1, 0.3]
+        elif noise_type == 'gaussian':
+            noise_levels = [0.05, 0.08]
+        elif noise_type == 'laplacian':
+            noise_levels = [0.04, 0.06]
+        elif noise_type == 'salt_and_pepper':
+            noise_levels = [0.02, 0.10]
+        elif noise_type == 'block':
+            noise_levels = [10, 15]
+        for noise_level in noise_levels:
+            print(f'Running with {noise_level} level...')
+            result = self.one_type_one_level(nmf, dataset, reduce, noise_type, noise_level, scaler_, max_iter, summary_only)
+            df = pd.concat([df, result], ignore_index=True)
+        return df
+    
+    def multi_types_multi_levels(self, nmf, dataset, reduce, scaler_='MinMax', max_iter=500, summary_only=True):
+        df = pd.DataFrame(columns=['dataset', 'noise type', 'noise level', 'seed', 'rmse', 'acc', 'nmi'])
+        noise_types = ['uniform', 'gaussian', 'laplacian', 'salt_and_pepper', 'block']
+        for noise_type in noise_types:
+            print(f'{noise_type} noise:')
+            result = self.one_type_multi_levels(nmf, dataset, reduce, noise_type, scaler_, max_iter, summary_only)
+            df = pd.concat([df, result], ignore_index=True)
+        return df
+    
+    def multi_datasets(self, nmf, scaler_='MinMax', max_iter=500, summary_only=True):
+        df = pd.DataFrame(columns=['dataset', 'noise type', 'noise level', 'seed', 'rmse', 'acc', 'nmi'])
+        datasets = ['ORL', 'YaleB']
+        for dataset in datasets:
+            print(f'{dataset} dataset:')
+            if dataset == 'ORL':
+                reduce = 1
+            elif dataset == 'YaleB':
+                reduce = 3
+            result = self.multi_types_multi_levels(nmf, dataset, reduce, scaler_, max_iter, summary_only)
+            df = pd.concat([df, result], ignore_index=True)
+        print('Done!')
+        return df

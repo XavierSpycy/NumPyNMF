@@ -1,10 +1,12 @@
 import time
 import numpy as np
-import scipy
+from scipy.linalg import pinv
+from sklearn.cluster import KMeans, BisectingKMeans
+from collections import Counter
+from sklearn.metrics import mean_squared_error,  accuracy_score, normalized_mutual_info_score
 import matplotlib.pyplot as plt
-from typing import Union, Dict
-from algorithm.initialization import NICA
-from algorithm.trainer import conditional_tqdm
+from typing import Union, Dict, Tuple
+from tqdm import tqdm
 
 class BasicNMF(object):
     """
@@ -16,8 +18,129 @@ class BasicNMF(object):
         """
         self.loss_list = []
 
-    def matricx_init(self, X: np.ndarray, n_components: int, 
-                     random_state: Union[int, np.random.RandomState, None]=None, verbose: bool=False) -> None:
+    def __PCA(self, X: np.ndarray, n_components: int) -> np.ndarray:
+        """
+        Principal Component Analysis (PCA) for dimensionality reduction.
+
+        Parameters:
+            X (numpy.ndarray): Input dataset of shape (n_samples, n_features).
+            n_components (int): Number of principal components to retain.
+
+        Returns:
+            transformed_data (numpy.ndarray): Dataset transformed into principal component space.
+        """
+        if n_components > X.shape[1]:
+            raise ValueError("n_components must be less than or equal to the number of features")
+
+        # Center the data
+        X_centered = X - np.mean(X, axis=0)
+        # Calculate the covariance matrix and its eigenvalues and eigenvectors
+        cov_mat = np.cov(X_centered, rowvar=False)
+        eigenvalues, eigenvectors = np.linalg.eigh(cov_mat)
+        # Sort the eigenvalues and eigenvectors in descending order
+        sorted_indices = eigenvalues.argsort()[::-1]
+        eigenvectors = eigenvectors[:, sorted_indices]
+        # Projection matrix using the first n_components eigenvectors
+        projection_matrix = eigenvectors[:, :n_components]
+        # Project the data onto the new feature space
+        transformed_data = np.dot(X_centered, projection_matrix)
+        return transformed_data
+
+    def __FastICA(self, X: np.ndarray, max_iter: int=200, random_state: Union[int, np.random.RandomState, None]=None) -> np.ndarray:
+        """
+        Implementation of FastICA algorithm to separate the independent sources 
+        from mixed signals in the input data.
+        
+        Parameters:
+        X (numpy.ndarray): Input dataset of shape (n_samples, n_features).
+        max_iter (int, optional): The maximum number of iterations for the convergence of the estimation. Default is 200.
+                                    
+        Return:
+        S (numpy.ndarray): Matrix of shape (n_samples, n_features) representing the estimated independent sources.
+        """
+        # Set the random state
+        rng = np.random.RandomState(random_state)
+        # Center the data by removing the mean
+        X = X - np.mean(X, axis=1, keepdims=True)
+        n = X.shape[0]
+        # Compute the independent components iteratively
+        W = np.zeros((n, n))
+        for i in range(n):
+            w = rng.rand(n)
+            for j in range(max_iter):  # max iterations for convergence
+                w_new = (X * np.dot(w, X)).mean(axis=1) - 2 * w
+                w_new /= np.sqrt((w_new ** 2).sum())
+                # Convergence check based on the weight vector's direction
+                if np.abs(np.abs((w_new * w).sum()) - 1) < 1e-04:
+                    break
+                w = w_new
+            W[i, :] = w
+            X -= np.outer(w, np.dot(w, X))
+        # Compute the estimated independent sources
+        S = np.dot(W, X)
+        return S
+    
+    def __NICA(self, X: np.ndarray, r: int, random_state: Union[int, np.random.RandomState, None]=None) -> (np.ndarray, np.ndarray):
+        """
+        Implementation of a non-negative Independent Component Analysis (NICA). 
+        The process involves obtaining a non-negative basic matrix and a 
+        non-negative coefficient matrix from the input data.
+
+        Parameters:
+        - X (numpy.ndarray): The input data matrix of shape (n_features, n_samples) 
+                            where n_samples is the number of samples, and n_features 
+                            is the number of features.
+        - r (int): The number of components to be retained after applying PCA.
+
+        Returns:
+        - W_0 (numpy.ndarray): The non-negative dictionary matrix.
+        - H_0 (numpy.ndarray): The non-negative representation matrix.
+        """
+        # Set A as a pseudoinverse of X
+        A = pinv(X.T)
+        # Apply PCA on the matrix A to generate the basic matrix W
+        W = self.__PCA(A, n_components=r)
+        # Whiten the basic matrix W obtained above by using the eigenvalue decomposition of the covariance matrix of W.
+        eigenvalues, eigenvectors = np.linalg.eigh(np.cov(W, rowvar=False))
+        # Preallocate memory for whitened matrix
+        W_whitened = np.empty_like(W)
+        np.dot(W, eigenvectors, out=W_whitened)
+        W_whitened /= np.sqrt(eigenvalues + 1e-5)
+        # Implement ICA algorithm on the whitened matrix W and obtain the independent basic matrix W_0
+        # Assuming FastICA() returns the transformed matrix
+        W_0 = self.__FastICA(W_whitened, random_state=random_state)
+        # Preallocate memory for H_0 and calculate it
+        H_0 = np.empty((W_0.shape[1], X.shape[1]))
+        np.dot(W_0.T, X, out=H_0)
+        # Take the absolute value in-place
+        np.abs(W_0, out=W_0)
+        np.abs(H_0, out=H_0)
+        return W_0, H_0
+    
+    def Kmeans(self, X: np.ndarray, n_components: int, random_state: Union[int, np.random.RandomState, None]=None) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Initialize D and R matrices using K-means algorithm.
+
+        Parameters:
+        - X (numpy.ndarray): Input data matrix of shape (n_features, n_samples).
+        - n_components (int): The number of components for matrix factorization.
+        - random_state (int, np.random.RandomState, None): Random state for reproducibility.
+        """
+        # Intialize
+        kmeans = KMeans(n_clusters=n_components, n_init='auto', random_state=random_state)
+        kmeans.fit(X.T)
+        D = kmeans.cluster_centers_.T
+        labels = kmeans.labels_
+        G = np.zeros(((len(labels)), n_components))
+        for i, label in enumerate(labels):
+            G[i, label] = 1
+        G = G / np.sqrt(np.sum(G, axis=0, keepdims=True))
+        G += 0.2
+        R = G.T
+        return D, R
+    
+    def matrix_init(self, X: np.ndarray, n_components: int, 
+                     random_state: Union[int, np.random.RandomState, None]=None) -> Tuple[np.ndarray, np.ndarray]:
         """
         Initialize D and R matrices using NICA algorithm.
 
@@ -25,18 +148,16 @@ class BasicNMF(object):
         - X (numpy.ndarray): Input data matrix of shape (n_features, n_samples).
         - n_components (int): The number of components for matrix factorization.
         - random_state (int, np.random.RandomState, None): Random state for reproducibility.
-        - verbose (bool, optional): Whether to print convergence information. Default is False.
+        
+        Returns:
+        - D (numpy.ndarray): The non-negative dictionary matrix.
+        - R (numpy.ndarray): The non-negative representation matrix.
         """
-        # Record start time
-        start_time = time.time()
         # Intialize
-        self.D, self.R = NICA(X, n_components, random_state=random_state)
-        # Copy D and R matrices for convergence check
-        self.D_prev, self.R_prev = self.D.copy(), self.R.copy()
-        if verbose:
-            print(f'Initialization done. Time elapsed: {time.time() - start_time:.2f} seconds.')
-
-    def fit(self, X: np.ndarray, n_components: int, max_iter: int=5000, 
+        D, R = self.__NICA(X, n_components, random_state=random_state)
+        return D, R
+        
+    def fit(self, X: np.ndarray, n_components: int, max_iter: int=500, 
             random_state: Union[int, np.random.RandomState, None]=None, 
             verbose: bool=True, imshow: bool=False, **kwargs) -> None:
         """
@@ -49,10 +170,18 @@ class BasicNMF(object):
         - random_state (int, np.random.RandomState, None, optional): Random state for reproducibility. Default is None.
         - imshow (bool, optional): Whether to plot convergence trend. Default is False.
         """
+        # Record start time
+        start_time = time.time()
         # Initialize D and R matrices using NICA algorithm
-        self.matricx_init(X, n_components, random_state, verbose)
+        self.D, self.R = self.matrix_init(X, n_components, random_state)
+        # Compute initialization time
+        init_time = time.time() - start_time
+        # Copy D and R matrices for convergence check
+        self.D_prev, self.R_prev = self.D.copy(), self.R.copy()
+        if verbose:
+            print(f'Initialization done. Time elapsed: {init_time:.2f} seconds.')
         # Iteratively update D and R matrices until convergence
-        for _ in conditional_tqdm(range(max_iter), verbose=verbose):
+        for _ in self.conditional_tqdm(range(max_iter), verbose=verbose):
             # Update D and R matrices
             flag = self.update(X, kwargs)
             # Check convergence
@@ -63,13 +192,109 @@ class BasicNMF(object):
         if imshow:
             self.plot()
 
+    def update(self, X: np.ndarray, kwargs: Dict[str, float]) -> None:
+        threshold = kwargs.get('threshold', 1e-6)
+        # Calculate L2-norm based errors for convergence
+        e_D = np.sqrt(np.sum((self.D - self.D_prev) ** 2, axis=(0, 1))) / self.D.size
+        e_R = np.sqrt(np.sum((self.R - self.R_prev) ** 2, axis=(0, 1))) / self.R.size
+        return (e_D < threshold and e_R < threshold)
+
     def plot(self) -> None:
         plt.plot(self.loss_list)
         plt.xlabel('Iteration')
         plt.ylabel('Cost function')
         plt.grid()
         plt.show()
+    
+    def conditional_tqdm(self, iterable, verbose: bool=True) -> int:
+        """
+        Determine whether to use tqdm or not based on the verbose flag.
 
+        Parameters:
+        - iterable (range): Range of values to iterate over.
+        - verbose (bool, optional): Whether to print progress bar. Default is True.
+
+        Returns:
+        - item (int): Current iteration.
+        """
+        if verbose:
+            for item in tqdm(iterable):
+                yield item
+        else:
+            for item in iterable:
+                yield item
+    
+    def normalize(self, epsilon: float=1e-7):
+        """
+        Normalize columns of D and rows of R.
+        """
+        # Normalize columns of D and rows of R
+        norms = np.sqrt(np.sum(self.D**2, axis=0))
+        self.D /= norms[np.newaxis, :] + epsilon
+        self.R *= norms[:, np.newaxis]
+    
+    def evaluate(self, X_clean, Y_true, random_state=None):
+        Y_label = self.__labeling(self.R.T, Y_true, random_state=random_state)
+        rmse = np.sqrt(mean_squared_error(X_clean, np.dot(self.D, self.R)))
+        acc = accuracy_score(Y_true, Y_label)
+        nmi = normalized_mutual_info_score(Y_true, Y_label)
+        return rmse, acc, nmi
+
+    def __labeling(self, X: np.ndarray, Y: np.ndarray, random_state: Union[int, np.random.RandomState, None]=None) -> np.ndarray:
+        """
+        Label data based on clusters obtained from KMeans clustering, 
+        by assigning the most frequent label in each cluster.
+        
+        Parameters:
+        - X (numpy.ndarray): Input feature matrix of shape (n_samples, n_features).
+        - Y (numpy.ndarray): True labels corresponding to each sample in X of shape (n_samples,).
+
+        Returns:
+        - Y_pred (numpy.ndarray): Predicted labels for each sample based on the clustering results.
+
+        Note:
+        This function works best when the input data is somewhat separated into distinct 
+        clusters that align with the true labels.
+        """
+        cluster = BisectingKMeans(len(set(Y)), random_state=random_state).fit(X)
+        Y_pred = np.zeros(Y.shape)
+        for i in set(cluster.labels_):
+            ind = cluster.labels_ == i
+            Y_pred[ind] = Counter(Y[ind]).most_common(1)[0][0] # assign label.
+        return Y_pred
+    
+    def vectorized_armijo_rule(self, f, grad_f, X, alpha, c=1e-4, tau=0.5):
+        """
+        Vectorized Armijo rule to find the step size for each element in the matrix.
+
+        Parameters:
+        - f: The objective function, which should accept a matrix and return a scalar.
+        - grad_f: The gradient of the objective function, which returns a matrix.
+        - X: Current point, a matrix.
+        - alpha: Initial step size, a scalar or a matrix.
+        - c: A constant in (0, 1), typically a small value (default is 1e-4).
+        - tau: Reduction factor for step size, typically in (0, 1) (default is 0.5).
+
+        Returns:
+        - alpha: Step sizes that satisfy the Armijo condition for each element.
+        """
+        # Compute the initial objective function value
+        f_x = f(X)
+        # Compute the initial gradient and its norm squared
+        grad_f_x = grad_f(X)
+        norm_grad_f_x_squared = np.square(np.linalg.norm(grad_f_x, axis=(0,1), keepdims=True))
+        
+        # Compute the sufficient decrease condition for the entire matrix
+        sufficient_decrease = f_x - c * alpha * norm_grad_f_x_squared
+        
+        counter = 0
+        # Check the condition for each element
+        while np.any(f(X - alpha * grad_f_x) > sufficient_decrease) or counter >= 10:
+            # Reduce alpha for elements not satisfying the condition
+            alpha *= tau
+            counter += 1
+        return alpha
+    
 class L2NormNMF(BasicNMF):
     """
     L2-norm NMF algorithm.
@@ -91,90 +316,12 @@ class L2NormNMF(BasicNMF):
         # Multiplicative update rule for D and R matrices
         self.D *= np.dot(X, self.R.T) / (np.dot(np.dot(self.D, self.R), self.R.T) + epsilon)
         self.R *= np.dot(self.D.T, X) / (np.dot(np.dot(self.D.T, self.D), self.R) + epsilon)
-
         # Calculate the loss function
         loss = np.linalg.norm(X - np.dot(self.D, self.R), 'fro') ** 2
         self.loss_list.append(loss)
-
         # Calculate L2-norm based errors for convergence
         e_D = np.sqrt(np.sum((self.D - self.D_prev) ** 2, axis=(0, 1))) / self.D.size
         e_R = np.sqrt(np.sum((self.R - self.R_prev) ** 2, axis=(0, 1))) / self.R.size
-        # Update previous matrices for next iteration
-        self.D_prev, self.R_prev = self.D.copy(), self.R.copy()
-        return (e_D < threshold and e_R < threshold)
-
-class L1NormNMF(BasicNMF):
-    """
-    L1-norm NMF algorithm.
-    """
-    def __init__(self, FISTA: bool=False) -> None:
-        """
-        Initialize the L1-norm NMF algorithm.
-
-        Parameters:
-        - FISTA (bool, optional): Whether to use FISTA update. Default is False.
-        """
-        super().__init__()
-        self.FISTA = FISTA
-        if FISTA:
-            self.t_prev = 1
-
-    def clip_gradient(self, gradient: np.ndarray, max_value: float) -> np.ndarray:
-        """
-        Clip the gradient to avoid explosion.
-        
-        Parameters:
-        - gradient (numpy.ndarray): Gradient matrix of shape (n_features, n_samples).
-        - max_value (float): Maximum value for gradient clipping.
-        """
-        norm = np.linalg.norm(gradient, 2)
-        if norm > max_value:
-            gradient = gradient / norm * max_value
-        return gradient
-    
-    def update(self, X: np.ndarray, kwargs: Dict[str, float]) -> None:
-        """
-        Update rule for D and R matrices using L1-norm NMF algorithm.
-
-        Parameters:
-        - X (numpy.ndarray): Input data matrix of shape (n_features, n_samples).
-        - alpha (float, optional): Learning rate for gradient descent. Default is 1e-6.
-        - threshold (float, optional): Convergence threshold based on L1-norm. Default is 1e-8.
-        - clip_grad_max (float, optional): Maximum value for gradient clipping. Default is 1e7.
-        """
-        # Get parameters from kwargs
-        alpha = kwargs.get('alpha', 1e-3)
-        threshold = kwargs.get('threshold', 1e-8)
-        clip_grad_max = kwargs.get('clip_grad_max', 1e7)
-        # Gradient with respect to the smooth part of the objective
-        residual = X - np.dot(self.D, self.R)
-        grad_D = - np.dot(residual, self.R.T)
-        grad_R = - np.dot(self.D.T, residual)
-        # Clip gradients using the inner function
-        grad_D = self.clip_gradient(grad_D, max_value=clip_grad_max)
-        grad_R = self.clip_gradient(grad_R, max_value=clip_grad_max)
-        # Proximal step
-        # For D
-        update_D = self.D - alpha * grad_D
-        self.D = np.sign(update_D) * np.maximum(0, np.abs(update_D) - alpha)
-        # For R
-        update_R = self.R - alpha * grad_R
-        R = np.sign(update_R) * np.maximum(0, np.abs(update_R) - alpha)
-        # Ensuring non-negativity of D and R after updates
-        self.D = np.abs(self.D)
-        self.R = np.abs(self.R)
-        # Calculate the loss function
-        loss = np.sum(np.abs(X - np.dot(self.D, self.R)))
-        self.loss_list.append(loss)
-        # FISTA update
-        if self.FISTA:
-            self.t = (1 + np.sqrt(1 + 4 * self.t_prev ** 2)) / 2
-            self.D += (self.t_prev - 1) / self.t * (self.D - self.D_prev)
-            self.R += (self.t_prev - 1) / self.t * (self.R - self.R_prev)
-            self.t_prev = self.t
-        # Calculate L1-norm based errors for convergence
-        e_D = np.sum(np.abs(self.D - self.D_prev)) / self.D.size
-        e_R = np.sum(np.abs(self.R - self.R_prev)) / self.R.size
         # Update previous matrices for next iteration
         self.D_prev, self.R_prev = self.D.copy(), self.R.copy()
         return (e_D < threshold and e_R < threshold)
@@ -224,59 +371,26 @@ class ISDivergenceNMF(BasicNMF):
         lambd = kwargs.get('lambd', 1e+2)
         threshold = kwargs.get('threshold', 1e-6)
         # Update R
-        DR_R_neg = 1 / (np.dot(self.D, self.R) + epsilon)
-        numerator_R = np.dot(self.D.T, (np.dot(np.dot(DR_R_neg, DR_R_neg.T), X)))
-        denominator_R = np.dot(self.D.T, DR_R_neg)
-        numerator_R += 2 * lambd * self.R
-        denominator_R += 2 * lambd * self.R
-        update_factor_R = numerator_R / (denominator_R + epsilon)
-        update_factor_R = self.clip_by_norm(update_factor_R, 1e+3, epsilon)
-        self.R *= update_factor_R
-        self.R = self.clip_matrix(self.R, 1e+6, 1e-6, epsilon)
-
+        DR = np.dot(self.D, self.R)
+        DR = np.where(DR > 0, DR, epsilon)
+        self.R *= (np.dot(self.D.T, (DR ** (-2) * X))) / (np.dot(self.D.T, DR ** (-1)) + epsilon)
         # Update D
-        DR_D_neg = 1 / (np.dot(self.D, self.R) + epsilon)
-        numerator_D = np.dot(np.dot(np.dot(DR_D_neg, DR_D_neg.T), X), self.R.T)
-        denominator_D = np.dot(DR_D_neg, self.R.T)
-        numerator_D += 2 * lambd * self.D
-        denominator_D += 2 * lambd * self.D
-        update_factor_D = numerator_D / (denominator_D + epsilon)
-        update_factor_D = self.clip_by_norm(update_factor_D, 1e+3, epsilon)
-        self.D *= update_factor_D
-        self.D = self.clip_matrix(self.D, 1e+6, 1e-6, epsilon)
-
-        # Normalize columns of D and rows of R
-        norms = np.linalg.norm(self.D, axis=0)
-        non_zero_cols = norms > epsilon
-        self.D[:, non_zero_cols] /= norms[non_zero_cols][np.newaxis, :]
-        self.R[non_zero_cols, :] *= norms[non_zero_cols][:, np.newaxis]
-
+        DR = np.dot(self.D, self.R)
+        DR = np.where(DR > 0, DR, epsilon)
+        self.D *= (np.dot((DR ** (-2) * X), self.R.T)) / (np.dot(DR ** (-1), self.R.T) + epsilon)
+        # Normalize D and R
+        self.normalize(epsilon)
+        # Calculate IS-divergence
         DR = np.dot(self.D, self.R) + epsilon
         is_div = np.sum(-np.log(np.maximum(epsilon, X / DR)) + X / DR - 1)
         # Adding L2 regularization terms to the IS-divergence
-        is_div += lambd * np.linalg.norm(self.D, 'fro') ** 2 + lambd * np.linalg.norm(self.R, 'fro')**2
+        # is_div += lambd * np.linalg.norm(self.D, 'fro') ** 2 + lambd * np.linalg.norm(self.R, 'fro')**2
         self.loss_list.append(is_div)
         flag = np.abs(is_div - self.prev_is_div) < threshold
         self.prev_is_div = is_div
         return flag
-    
-    def clip_by_norm(self, array, max_norm, epsilon):
-        """Clip the array based on its norm to avoid large values."""
-        norm = scipy.linalg.norm(array, 2)
-        if norm > max_norm:
-            array = array + epsilon * np.eye(*array.shape)
-        return array
 
-    def clip_matrix(self, matrix, max_norm, min_norm, epsilon):
-        """Clip the matrix based on its norm to avoid large values or small values."""
-        norm = scipy.linalg.norm(matrix, 'fro')
-        if norm > max_norm:
-            matrix *= max_norm / (norm + epsilon)
-        if norm < min_norm:
-            matrix *= min_norm / (norm + epsilon)
-        return matrix
-
-class RobustNMF(BasicNMF):
+class L21NormNMF(BasicNMF):
     def __init__(self) -> None:
         super().__init__()
     
@@ -330,29 +444,30 @@ class L1NormRegularizedNMF(BasicNMF):
         self.D *=  (np.abs(update_D) - update_D) / (2 * np.dot(np.dot(self.D, self.R), self.R.T) + epsilon)
         update_R = np.dot(self.D.T, S - X)
         self.R *=  (np.abs(update_R) - update_R) / (2 * np.dot(np.dot(self.D.T, self.D), self.R) + epsilon)
-        # Normalize columns of D and rows of R
-        norms = np.sqrt(np.sum(self.D**2, axis=0))
-        self.D /= norms[np.newaxis, :] + epsilon
-        self.R *= norms[:, np.newaxis]
-
+        self.normalize(epsilon)
         # Calculate the loss function
         loss = np.linalg.norm(X - np.dot(self.D, self.R) - S, 'fro') ** 2 + lambd * np.sum(np.abs(S))
         self.loss_list.append(loss)
-
         # Calculate L2-norm based errors for convergence
         e_D = np.sqrt(np.sum((self.D - self.D_prev) ** 2, axis=(0, 1))) / self.D.size
         e_R = np.sqrt(np.sum((self.R - self.R_prev) ** 2, axis=(0, 1))) / self.R.size
         # Update previous matrices for next iteration
         self.D_prev, self.R_prev = self.D.copy(), self.R.copy()
         return (e_D < threshold and e_R < threshold)
+    
+    def matrix_init(self, X: np.ndarray, n_components: int, 
+                     random_state: Union[int, np.random.RandomState, None]=None) -> None:
+        return self.Kmeans(X, n_components, random_state)
 
 class CauchyNMF(BasicNMF):
     def __init__(self) -> None:
         super().__init__()
     
-    def calculate_rule(self, A, B, epsilon):
+    def compute(self, A, B, epsilon):
         """Update rule for Cauchy divergence."""
-        return B / (A + np.sqrt(A**2 + 2 * B * A + epsilon) + epsilon)
+        temp = A ** 2 + 2 * B * A
+        temp = np.where(temp > 0, temp, epsilon)
+        return B / (A + np.sqrt(temp))
 
     def update(self, X, kwargs):
         # Get parameters from kwargs
@@ -367,12 +482,12 @@ class CauchyNMF(BasicNMF):
         DR = np.dot(self.D, self.R)
         A = 3 / 4 * np.dot((DR / (DR ** 2 + X + epsilon)), self.R.T)
         B = np.dot(1 / (DR + epsilon), self.R.T)
-        self.D *= self.calculate_rule(A, B, epsilon)
+        self.D *= self.compute(A, B, epsilon)
         # Update rule for R
         DR = np.dot(self.D, self.R)
         A = 3 / 4 * np.dot(self.D.T, (DR / (DR ** 2 + X + epsilon)))
         B = np.dot(self.D.T, 1 / (DR + epsilon))
-        self.R *= self.calculate_rule(A, B, epsilon)
+        self.R *= self.compute(A, B, epsilon)
         # Calculate Cauchy divergence
         DR = np.dot(self.D, self.R)
         cauchy_div = np.sum(np.log(DR + epsilon) - np.log(X + epsilon) + (X - DR) / (DR + epsilon))
@@ -384,7 +499,12 @@ class CauchyNMF(BasicNMF):
 class CappedNormNMF(BasicNMF):
     def __init__(self) -> None:
         super().__init__()
-
+        self.loss_prev = float('inf')
+    
+    def matrix_init(self, X: np.ndarray, n_components: int, 
+                     random_state: Union[int, np.random.RandomState, None]=None) -> None:
+        return self.Kmeans(X, n_components, random_state)
+    
     def update(self, X, kwargs):
         """
         Update rule for D and R matrices using Capped Norm NMF algorithm.
@@ -395,90 +515,72 @@ class CappedNormNMF(BasicNMF):
         - threshold (float, optional): Convergence threshold based on L2,1-norm. Default is 1e-4.
         - epsilon (float, optional): Small constant added to denominator to prevent division by zero. Default is 1e-7.
         """
-        theta = kwargs.get('theta', 0.7)
-        threshold = kwargs.get('threshold', 1e-8)
+        theta = kwargs.get('theta', 0.2)
+        threshold = kwargs.get('threshold', 1e-3)
         epsilon = kwargs.get('epsilon', 1e-7)
         if not hasattr(self, 'I'):
             self.n_samples = X.shape[1]
-            self.I = np.eye(self.n_samples)
+            self.I = np.identity(self.n_samples)
         # Multiplicative update rule for D and R matrices
-        self.D *= np.dot(np.dot(X, self.I), self.R.T) / (np.dot(np.dot(np.dot(self.D, self.R), self.I), self.R.T) + epsilon)
-        self.R *= np.sqrt(np.dot(np.dot(self.D.T, X), self.I) / (np.dot(np.dot(np.dot(np.dot(self.D.T, X), self.R.T), self.R), self.I) + epsilon) + epsilon)
-
+        G = self.R.T
+        self.D *= np.dot(np.dot(X, self.I), G) / (np.dot(np.dot(np.dot(self.D, G.T), self.I), G) + epsilon)
+        G *= np.sqrt((np.dot(np.dot(self.I, X.T), self.D)) / (np.dot(np.dot(np.dot(np.dot(self.I, G), G.T), X.T), self.D) + epsilon))
+        self.R = G.T
         # Update rule for I
         diff = X - np.dot(self.D, self.R)
         norms = np.linalg.norm(diff, axis=0)
-        for j in range(self.n_samples):
-            if norms[j] < theta:
-                self.I[j, j] = 1 / (2 * norms[j])
-            else:
-                self.I[j, j] = 0
-
+        norms /= np.max(norms)
+        I = np.full_like(norms, epsilon)
+        indices = np.where(norms < theta)
+        I[indices] = 1 / (2 * norms[indices])
+        self.I = np.diagflat(I)
         # Calculate the loss function
         loss = np.linalg.norm(X - np.dot(self.D, self.R), 'fro') ** 2
+        flag = abs(loss - self.loss_prev) < threshold
         self.loss_list.append(loss)
-        # Calculate L2-norm based errors for convergence
-        e_D = np.sqrt(np.sum((self.D - self.D_prev) ** 2, axis=(0, 1))) / self.D.size
-        e_R = np.sqrt(np.sum((self.R - self.R_prev) ** 2, axis=(0, 1))) / self.R.size
-        return (e_D < threshold and e_R < threshold)
+        self.loss_prev = loss
+        return flag
 
-class HypersurfaceNMF(BasicNMF):
+class HSCostNMF(BasicNMF):
     def __init__(self) -> None:
         super().__init__()
-        self.i = 0
-    
+        self.loss_prev = float('inf')
+        # Objective function and its gradient
+        self.obj_func = lambda X, D, R: np.linalg.norm(X - np.dot(D, R), 'fro')
+        self.grad_D = lambda X, D, R: (np.dot((np.dot(D, R) - X), R.T)) / np.sqrt(1 + np.linalg.norm(X - np.dot(D, R), 'fro'))
+        self.grad_R = lambda X, D, R: (np.dot(D.T, (np.dot(D, R) - X))) / np.sqrt(1 + np.linalg.norm(X - np.dot(D, R), 'fro'))
+
     def update(self, X, kwargs):
         """
-        Update rule for D and R matrices using Hypersurface NMF algorithm.
+        Update rule for D and R matrices using Hypersurface Cost NMF algorithm.
 
         Parameters:
         - X (numpy.ndarray): Input data matrix of shape (n_features, n_samples).
-        - beta1 (float, optional): Exponential decay rate for the first moment estimates. Default is 0.9.
-        - beta2 (float, optional): Exponential decay rate for the second moment estimates. Default is 0.999.
-        - alpha (float, optional): Learning rate for gradient descent. Default is 1e-3.
+        - alpha (float, optional): Learning rate for gradient descent. Default is 0.1.
+        - beta (float, optional): Learning rate for gradient descent. Default is 0.1.
         - epsilon (float, optional): Small constant added to denominator to prevent division by zero. Default is 1e-7.
         - threshold (float, optional): Convergence threshold based on L2,1-norm. Default is 1e-8.
         """
-        beta1 = kwargs.get('beta1', 0.9)
-        beta2 = kwargs.get('beta2', 0.999)
-        self.alpha = kwargs.get('alpha', 1e-3)
-        epsilon = kwargs.get('epsilon', 1e-7)
         threshold = kwargs.get('threshold', 1e-8)
-
-        self.D = np.abs(self.D)
-        self.R = np.abs(self.R)
-        if not hasattr(self, 'm_D'):
-            self.m_D, self.v_D = np.zeros_like(self.D), np.zeros_like(self.D)
-            self.m_R, self.v_R = np.zeros_like(self.R), np.zeros_like(self.R)
-            self.loss_prev = np.sqrt(1 + np.linalg.norm(X - np.dot(self.D, self.R), 'fro')) - 1
-        # Gradient with respect to the smooth part of the objective
-        grad_D = - (np.dot(np.dot(self.D, self.R), self.R.T) - np.dot(X, self.R.T)) / (np.sqrt(1 + np.linalg.norm(X - np.dot(self.D, self.R), 'fro')) + epsilon)
-        grad_R = - (np.dot(self.D.T, np.dot(self.D, self.R)) - np.dot(self.D.T, X)) / (np.sqrt(1 + np.linalg.norm(X - np.dot(self.D, self.R), 'fro')) + epsilon)
-
-        # Adam update for D
-        self.m_D = beta1 * self.m_D + (1 - beta1) * grad_D
-        self.v_D = beta2 * self.v_D + (1 - beta2) * (grad_D ** 2)
-        m_D_corr = self.m_D / (1 - beta1 ** (self.i + 1))
-        v_D_corr = self.v_D / (1 - beta2 ** (self.i + 1))
-        self.D -= self.alpha * m_D_corr / (np.sqrt(v_D_corr) + epsilon)
-
-        # Adam update for R
-        self.m_R = beta1 * self.m_R + (1 - beta1) * grad_R
-        self.v_R = beta2 * self.v_R + (1 - beta2) * (grad_R ** 2)
-        m_R_corr = self.m_R / (1 - beta1 ** (self.i + 1))
-        v_R_corr = self.v_R / (1 - beta2 ** (self.i + 1))
-        self.R -= self.alpha * m_R_corr / (np.sqrt(v_R_corr) + epsilon)
-
+        if not hasattr(self, 'alpha'):
+            self.alpha = np.full_like(self.D, kwargs.get('alpha', 0.1))
+            self.beta = np.full_like(self.R, kwargs.get('beta', 0.1))
+        c = kwargs.get('c', 1e-4)
+        tau = kwargs.get('tau', 0.5)
+        # Vectorized Armijo rule to update alpha and beta
+        self.alpha = self.vectorized_armijo_rule(lambda D: self.obj_func(X, D, self.R), lambda D: self.grad_D(X, D, self.R), self.D, self.alpha, c, tau)
+        self.beta = self.vectorized_armijo_rule(lambda R: self.obj_func(X, self.D, R), lambda R: self.grad_R(X, self.D, R), self.R, self.beta, c, tau)
+        self.alpha = np.maximum(self.alpha, threshold)
+        self.beta = np.maximum(self.beta, threshold)
+        # Update rule for D and R
+        self.D -= self.alpha * (np.dot((np.dot(self.D, self.R) - X), self.R.T)) / np.sqrt(1 + np.linalg.norm(X - np.dot(self.D, self.R), 'fro'))
+        self.R -= self.beta * (np.dot(self.D.T, (np.dot(self.D, self.R) - X))) / np.sqrt(1 + np.linalg.norm(X - np.dot(self.D, self.R), 'fro'))
+        self.D[np.where(self.D < 0)] = 0
+        self.R[np.where(self.R < 0)] = 0
         # Calculate loss
         loss_current = np.sqrt(1 + np.linalg.norm(X - np.dot(self.D, self.R), 'fro')) - 1
         self.loss_list.append(loss_current)
-
         flag = abs(loss_current - self.loss_prev) < threshold
         # Update previous loss for next iteration 
         self.loss_prev = loss_current
-        # Update iteration number
-        self.i += 1
-        # Adjust learning rate
-        if self.i % 100 == 0:
-            self.alpha *= 0.1
         return flag
