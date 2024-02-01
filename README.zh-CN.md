@@ -1,4 +1,34 @@
 [English](README.md) | 中文版
+
+<div align="center" style="font-weight: bold;">
+  <a href="app.py">Demo</a>
+</div>
+<div align="center" style="font-weight: bold;">
+  运行中...
+</div>
+<p align="center">
+  <img src="figures/app_screen_shoot.jpg">
+</p>
+<div align="center" style="font-weight: bold;">
+  结果
+</div>
+<p align="center">
+  <img src="figures/app_screen_shoot_2.jpg">
+</p>
+
+深入体验我们技术的核心，通过实际操作来演示。只需在您的终端中启动此过程：
+
+```bash
+$ python app.py
+```
+
+通过几个简单的步骤直接与我们的算法互动：
+- 步骤1. 在左侧选择您希望的参数；
+- 步骤2. 点击`执行算法`；
+- 步骤3. 期待在右侧获得您的定制化结果。
+
+体验我们触手可及的解决方案。
+
 # 用NumPy非负矩阵分解
 - [快速开始](#rocket-快速开始)
 - [1. 简介](#1-sparkles-简介)
@@ -57,7 +87,7 @@ class ExampleNMF(BasicNMF):
         # D, R = np.array(D), np.array(R)
         return D, R  # Ensure D, R are returned.
 
-    def update(self, X, kwargs):
+    def update(self, X, **kwargs):
         # Implement the logic for iterative updates here.
         # Modify self.D, self.R as per your algorithm's logic.
         # flag = <convergence_criterion>
@@ -981,15 +1011,23 @@ where $I(\cdot,\cdot$) is the mutual information,$H(\cdot)$ is the entropy.
 
 ## 8. 更新日志 & TODO清单
 - 2023-10-20      
-  - TODO清单:
-    - NumPy内存预分配
-    - 算法故障原因
-    - GUI界面
+    - TODO清单:
+        - NumPy内存预分配 :x: (与可读性冲突)
+        - 算法故障原因 (已完成: 2023-11-24)
+        - GUI界面 (已完成: 2024-02-01)
 - 2023-11-10
-  - 更新日志:
-    - 提升`algorithm.NMF`模块
-    - 修复部分算法故障
-
+    - 更新日志:
+        - 提升`algorithm.NMF`模块
+        - 修复部分算法故障
+- 2023-11-24
+    - 更新日志:
+        - 丢弃一些模块并退耦`algorithm.nmf`，使其对用户和迁移至其他任务更灵活
+        - 整合丢弃的模块中的基础函数至`BasicNMF`
+- 2024-02-01
+    - 更新日志: 
+        - 发布用户交互脚本
+        - 引入高阶技巧
+        - 分步流式化过程
 
 ## 9. :handshake: 贡献
 我们欢迎任何形式的贡献，无论是提出新功能的建议，报告bug，还是帮助优化代码。以下是开始的步骤：

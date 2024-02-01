@@ -1,4 +1,32 @@
 English| [中文版](README.zh-CN.md)
+
+<div align="center" style="font-weight: bold;">
+  <a href="app.py">Demo</a>
+</div>
+<div align="center" style="font-weight: bold;">
+  Running...
+</div>
+<p align="center">
+  <img src="figures/app_screen_shoot.jpg">
+</p>
+<div align="center" style="font-weight: bold;">
+  Results
+</div>
+<p align="center">
+  <img src="figures/app_screen_shoot_2.jpg">
+</p>
+
+Dive into the heart of our technology with a hands-on demonstration. Simply initiate the process in your terminal:
+
+```bash
+$ python app.py
+```
+
+Engage directly with our algorithm in a few easy steps: 
+- Step 1. Select your desired parameters on the left side; 
+- Step 2. Click `Execute Algorithm`; 
+- Step 3. Eagerly await your customized results on the right. Experience our solutions at your fingertips.
+
 # Non-negative Matrix Factorization using NumPy
 - [Quick Start](#rocket-quick-start)
 - [1. Introduction](#1-sparkles-introduction)
@@ -56,7 +84,7 @@ class ExampleNMF(BasicNMF):
         # D, R = np.array(D), np.array(R)
         return D, R  # Ensure D, R are returned.
 
-    def update(self, X, kwargs):
+    def update(self, X, **kwargs):
         # Implement the logic for iterative updates here.
         # Modify self.D, self.R as per your algorithm's logic.
         # flag = <convergence_criterion>
@@ -983,18 +1011,23 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
 
 ## 8. Update Log & TODO List
 - 2023-10-20      
-  - TODO List:
-    - NumPy memory preallocation
-    - Reasons for algorithmic non-functionality
-    - GUI interface
+    - TODO List:
+        - NumPy memory preallocation :x: (Conflicts with readability)
+        - Reasons for algorithmic non-functionality (Done: 2023-11-24)
+        - GUI interface (Done: 2024-02-01)
 - 2023-11-10
-  - Update Log:
-    - Enhanced `algorithm.NMF` module
-    - Fixed non-functionality of several algorithms
-- 2023-11
-  - Update Log:
-    - Deprecated some modules and decoupled `algorithm.nmf`, which makes it flexible for users to transfer on other tasks
-    - Integrated the basic functions in the deprecated modules into `BasicNMF`
+    - Update Log:
+        - Enhanced `algorithm.NMF` module
+        - Fixed non-functionality of several algorithms
+- 2023-11-24
+    - Update Log:
+        - Deprecated some modules and decoupled `algorithm.nmf`, which makes it flexible for users to transfer on other tasks
+        - Integrated the basic functions in the deprecated modules into `BasicNMF`
+- 2024-02-01
+    - Update Log: 
+        - Released user interface scripts.
+        - Introduced advanced techniques.
+        - Streamlined processes in a step-by-step manner
 
 ## 9. :handshake: Contribution
 We welcome contributions of any kind, whether it's suggesting new features, reporting bugs, or helping with code optimizations. Here are the steps to get started:

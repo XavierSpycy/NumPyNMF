@@ -106,6 +106,8 @@ def origin_versus_dictrep(X: np.ndarray, D: np.ndarray, R: np.ndarray, X_noise: 
     # Render the figure
     plt.tight_layout()
     plt.show()
+    
+    return X_i, X_noise_i, DR_i
 
 def origin_noise_dictrep(X: np.ndarray, X_noise: np.ndarray, D: np.ndarray, R: np.ndarray, image_size: tuple, reduce: int, idx: int) -> None:
     """

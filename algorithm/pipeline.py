@@ -1,11 +1,13 @@
+from typing import Union
+
 import numpy as np
 import pandas as pd
+
 from algorithm.datasets import load_data, get_image_size
 from algorithm.preprocess import NoiseAdder, MinMaxScaler, StandardScaler
 from algorithm.sample import random_sample
 from algorithm.nmf import BasicNMF, L2NormNMF, KLDivergenceNMF, ISDivergenceNMF, L21NormNMF, HSCostNMF, L1NormRegularizedNMF, CappedNormNMF, CauchyNMF
 from algorithm.user_evaluate import evaluate
-from typing import Union
 
 class BasicBlock(object):
     def basic_info(self, nmf, dataset, scaler):
@@ -70,7 +72,8 @@ class BasicBlock(object):
         return X_hat_scaled, X_noise_scaled
 
 class Pipeline(BasicBlock):
-    def __init__(self, nmf: Union[str, BasicNMF], dataset: str='ORL', reduce: int=1, noise_type: str='uniform', noise_level: float=0.02, random_state: int=3407, scaler: str='MinMax') -> None:
+    def __init__(self, nmf: Union[str, BasicNMF], dataset: str='ORL', reduce: int=1, noise_type: str='uniform', 
+                 noise_level: float=0.02, random_state: int=3407, scaler: str='MinMax') -> None:
         """
         Initialize the pipeline.
 
@@ -92,8 +95,9 @@ class Pipeline(BasicBlock):
         self.__X_hat_scaled, self.__X_noise_scaled = self.scale(X_hat, X_noise, scaler)
         self.reduce = reduce
         self.random_state = random_state
+        del X_hat, X_noise, folder, scaler, noise_type, noise_level, random_state, dataset, reduce, nmf
 
-    def run(self, max_iter, convergence_trend=False, matrix_size=False, verbose=False) -> None:
+    def execute(self, max_iter, convergence_trend=False, matrix_size=False, verbose=False) -> None:
         """
         Run the pipeline.
 
@@ -120,6 +124,25 @@ class Pipeline(BasicBlock):
         evaluate(self.nmf, self.metrics, self.__X_hat_scaled, self.__X_noise_scaled, 
                 self.img_size, self.reduce, idx, imshow)
 
+    def visualization(self, idx=2):
+        DR = np.dot(self.D, self.R).reshape(self.__X_hat_scaled.shape[0], self.__X_hat_scaled.shape[1])
+        # Calculate reduced image size based on the 'reduce' factor
+        img_size = [i//self.reduce for i in self.img_size]
+        
+        # Retrieve the specified image from the data
+        X_i = self.__X_hat_scaled[:,idx].reshape(img_size[1],img_size[0])
+        X_noise_i = self.__X_noise_scaled[:,idx].reshape(img_size[1],img_size[0])
+        DR_i = DR[:,idx].reshape(img_size[1],img_size[0])
+        return X_i, X_noise_i, DR_i
+    
+    def cleanup(self):
+        """
+        Cleanup method to release resources and delete instances.
+        """
+        # Delete attributes that might occupy significant memory
+        if hasattr(self, 'nmf'):
+            del self.nmf, self.__X_hat_scaled, self.__X_noise_scaled, self.D, self.R, self.metrics
+
 class Experiment(BasicBlock):
     def __init__(self, seeds=[0, 42, 99, 512, 3407]):
         self.seeds = seeds
@@ -128,14 +151,9 @@ class Experiment(BasicBlock):
         df = pd.DataFrame(columns=['dataset', 'noise type', 'noise level', 'seed', 'rmse', 'acc', 'nmi'])
         for seed in self.seeds:
             pipeline = Pipeline(nmf, dataset, reduce, noise_type, noise_level, seed, scaler_)
-            rmse, acc, nmi = pipeline.run(max_iter=max_iter)
-            """folder, scaler, self.nmf = self.basic_info(nmf, dataset, scaler_)
-            X_hat, Y_hat, self.img_size = self.load_data(folder, reduce=reduce, random_state=seed)
-            X_noise = self.add_noise(X_hat, noise_type, noise_level, seed, reduce)
-            X_hat_scaled, X_noise_scaled = self.scale(X_hat, X_noise, scaler)
-            self.reduce = reduce
-            self.nmf.fit(X_noise_scaled, len(set(Y_hat)), max_iter=max_iter, random_state=seed, imshow=False, verbose=False)
-            rmse, acc, nmi = self.nmf.evaluate(X_hat_scaled, Y_hat, random_state=seed)"""
+            rmse, acc, nmi = pipeline.execute(max_iter=max_iter)
+            pipeline.cleanup()
+            del pipeline
             result = pd.DataFrame({'dataset': dataset, 'noise type': noise_type, 'noise level': noise_level, 
                                    'seed': seed, 'rmse': rmse, 'acc': acc, 'nmi': nmi}, index=[0])
             df = pd.concat([df, result], ignore_index=True)

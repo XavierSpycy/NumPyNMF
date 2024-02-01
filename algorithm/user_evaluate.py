@@ -1,5 +1,7 @@
-import numpy as np
 from typing import Tuple
+
+import numpy as np
+
 from algorithm.nmf import BasicNMF
 from algorithm.visualize import origin_versus_dictrep
 

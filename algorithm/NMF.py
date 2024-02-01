@@ -1,14 +1,18 @@
+import os
 import time
-import numpy as np
-from scipy.linalg import pinv
-from sklearn.cluster import KMeans, BisectingKMeans
+import pickle
+from abc import ABC, abstractmethod
 from collections import Counter
-from sklearn.metrics import mean_squared_error,  accuracy_score, normalized_mutual_info_score
-import matplotlib.pyplot as plt
 from typing import Union, Dict, Tuple
-from tqdm import tqdm
 
-class BasicNMF(object):
+import numpy as np
+from tqdm import tqdm
+from scipy.linalg import pinv
+import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans, BisectingKMeans
+from sklearn.metrics import mean_squared_error,  accuracy_score, normalized_mutual_info_score
+
+class BasicNMF(ABC):
     """
     A basic framework for Non-negative Matrix Factorization (NMF) algorithms.
     """
@@ -167,6 +171,7 @@ class BasicNMF(object):
         - X (numpy.ndarray): Input data matrix of shape (n_features, n_samples).
         - n_components (int): The number of components for matrix factorization.
         - max_iter (int, optional): Maximum number of iterations. Default is 5000.
+        - verbose (bool, optional): Whether to show the progress bar.
         - random_state (int, np.random.RandomState, None, optional): Random state for reproducibility. Default is None.
         - imshow (bool, optional): Whether to plot convergence trend. Default is False.
         """
@@ -183,7 +188,7 @@ class BasicNMF(object):
         # Iteratively update D and R matrices until convergence
         for _ in self.conditional_tqdm(range(max_iter), verbose=verbose):
             # Update D and R matrices
-            flag = self.update(X, kwargs)
+            flag = self.update(X, **kwargs)
             # Check convergence
             if flag:
                 if verbose:
@@ -192,12 +197,12 @@ class BasicNMF(object):
         if imshow:
             self.plot()
 
-    def update(self, X: np.ndarray, kwargs: Dict[str, float]) -> None:
-        threshold = kwargs.get('threshold', 1e-6)
+    @abstractmethod
+    def update(self, X: np.ndarray, **kwargs: Dict[str, float]) -> None:
         # Calculate L2-norm based errors for convergence
         e_D = np.sqrt(np.sum((self.D - self.D_prev) ** 2, axis=(0, 1))) / self.D.size
         e_R = np.sqrt(np.sum((self.R - self.R_prev) ** 2, axis=(0, 1))) / self.R.size
-        return (e_D < threshold and e_R < threshold)
+        return (e_D < 1e-6 and e_R < 1e-6)
 
     def plot(self) -> None:
         plt.plot(self.loss_list)
@@ -295,6 +300,21 @@ class BasicNMF(object):
             counter += 1
         return alpha
     
+    @classmethod
+    def from_pretrained(cls, file_path, **kwargs):
+        with open(os.path.join(file_path), 'rb') as file:
+            params = pickle.load(file)
+        instance = cls(**kwargs)
+        instance.__dict__.update(params)
+        return instance
+    
+    def save(self, file_path):
+        with open(file_path, 'wb') as file:
+            pickle.dump(self.__dict__, file)
+    
+    def __call__(self, **kwargs):
+        self.fit(**kwargs)
+    
 class L2NormNMF(BasicNMF):
     """
     L2-norm NMF algorithm.
@@ -302,7 +322,7 @@ class L2NormNMF(BasicNMF):
     def __init__(self) -> None:
         super().__init__()
 
-    def update(self, X: np.ndarray, kwargs: Dict[str, float]) -> None:
+    def update(self, X: np.ndarray, threshold: float=1e-6, epsilon: float=1e-7) -> None:
         """
         Update rule for D and R matrices using L2-norm NMF algorithm.
 
@@ -311,8 +331,6 @@ class L2NormNMF(BasicNMF):
         - threshold (float, optional): Convergence threshold based on L2-norm. Default is 1e-6.
         - epsilon (float, optional): Small constant added to denominator to prevent division by zero. Default is 1e-7.
         """
-        threshold = kwargs.get('threshold', 1e-6)
-        epsilon = kwargs.get('epsilon', 1e-7)
         # Multiplicative update rule for D and R matrices
         self.D *= np.dot(X, self.R.T) / (np.dot(np.dot(self.D, self.R), self.R.T) + epsilon)
         self.R *= np.dot(self.D.T, X) / (np.dot(np.dot(self.D.T, self.D), self.R) + epsilon)
@@ -337,7 +355,7 @@ class KLDivergenceNMF(BasicNMF):
         super().__init__()
         self.prev_kl = float('inf')
 
-    def update(self, X: np.ndarray, kwargs: Dict[str, float]) -> None:
+    def update(self, X: np.ndarray, epsilon: float=1e-7, threshold: float=1e-4) -> None:
         """
         Update rule for D and R matrices using KL-divergence NMF algorithm.
 
@@ -346,8 +364,6 @@ class KLDivergenceNMF(BasicNMF):
         - epsilon (float, optional): Small constant added to denominator to prevent division by zero. Default is 1e-7.
         - threshold (float, optional): Convergence threshold based on KL-divergence. Default is 1e-4.
         """
-        epsilon = kwargs.get('epsilon', 1e-7)
-        threshold = kwargs.get('threshold', 1e-4)
         # Multiplicative update rule for D and R matrices
         self.D *= np.dot(X / (np.dot(self.D, self.R) + epsilon), self.R.T) / (np.dot(np.ones(X.shape), self.R.T) + epsilon)
         self.R *= np.dot(self.D.T, X / (np.dot(self.D, self.R) + epsilon)) / (np.dot(self.D.T, np.ones(X.shape)) + epsilon)
@@ -365,11 +381,7 @@ class ISDivergenceNMF(BasicNMF):
         super().__init__()
         self.prev_is_div = float('inf')
 
-    def update(self, X, kwargs):
-        # Get parameters from kwargs
-        epsilon = kwargs.get('epsilon', 1e-7)
-        lambd = kwargs.get('lambd', 1e+2)
-        threshold = kwargs.get('threshold', 1e-6)
+    def update(self, X, lambd=1e+2, epsilon=1e-7, threshold=1e-6):
         # Update R
         DR = np.dot(self.D, self.R)
         DR = np.where(DR > 0, DR, epsilon)
@@ -394,10 +406,7 @@ class L21NormNMF(BasicNMF):
     def __init__(self) -> None:
         super().__init__()
     
-    def update(self, X, kwargs):
-        # Get parameters from kwargs
-        epsilon = kwargs.get('epsilon', 1e-7)
-        threshold = kwargs.get('threshold', 1e-4)
+    def update(self, X, epsilon=1e-7, threshold=1e-4):
         # Multiplicative update rule for D and R matrices
         residual = X - np.dot(self.D, self.R) # residual.shape = (n_features, n_samples)
         norm_values = np.sqrt(np.sum(residual ** 2, axis=1))
@@ -430,11 +439,12 @@ class L1NormRegularizedNMF(BasicNMF):
         """
         return np.where(x > lambd, x - lambd, np.where(x < -lambd, x + lambd, 0))
     
-    def update(self, X, kwargs):
-        # Get parameters from kwargs
-        lambd = kwargs.get('lambd', 0.2)
-        threshold = kwargs.get('threshold', 1e-8)
-        epsilon = kwargs.get('epsilon', 1e-7)
+    def update(self, X, lambd=0.2, threshold=1e-8, epsilon=1e-7):
+        """
+        
+        Parameters:
+        lambd
+        """
         # Compute the error matrix
         S = X - np.dot(self.D, self.R)
         # Soft thresholding operator
@@ -469,10 +479,7 @@ class CauchyNMF(BasicNMF):
         temp = np.where(temp > 0, temp, epsilon)
         return B / (A + np.sqrt(temp))
 
-    def update(self, X, kwargs):
-        # Get parameters from kwargs
-        epsilon = kwargs.get('epsilon', 1e-7)
-        threshold = kwargs.get('threshold', 1e-4)
+    def update(self, X, epsilon: float=1e-7, threshold=1e-4):
         if not hasattr(self, 'prev_cauchy_div'):
             DR = np.dot(self.D, self.R)
             log_residual = np.log(DR + epsilon) - np.log(X + epsilon)
@@ -505,7 +512,7 @@ class CappedNormNMF(BasicNMF):
                      random_state: Union[int, np.random.RandomState, None]=None) -> None:
         return self.Kmeans(X, n_components, random_state)
     
-    def update(self, X, kwargs):
+    def update(self, X, theta: float=0.2, threshold: float=1e-3, epsilon: float=1e-7):
         """
         Update rule for D and R matrices using Capped Norm NMF algorithm.
 
@@ -515,9 +522,6 @@ class CappedNormNMF(BasicNMF):
         - threshold (float, optional): Convergence threshold based on L2,1-norm. Default is 1e-4.
         - epsilon (float, optional): Small constant added to denominator to prevent division by zero. Default is 1e-7.
         """
-        theta = kwargs.get('theta', 0.2)
-        threshold = kwargs.get('threshold', 1e-3)
-        epsilon = kwargs.get('epsilon', 1e-7)
         if not hasattr(self, 'I'):
             self.n_samples = X.shape[1]
             self.I = np.identity(self.n_samples)
@@ -550,7 +554,7 @@ class HSCostNMF(BasicNMF):
         self.grad_D = lambda X, D, R: (np.dot((np.dot(D, R) - X), R.T)) / np.sqrt(1 + np.linalg.norm(X - np.dot(D, R), 'fro'))
         self.grad_R = lambda X, D, R: (np.dot(D.T, (np.dot(D, R) - X))) / np.sqrt(1 + np.linalg.norm(X - np.dot(D, R), 'fro'))
 
-    def update(self, X, kwargs):
+    def update(self, X, threshold: float=1e-8, alpha: float=0.1, beta: float=0.1, c: float=1e-4, tau: float=0.5):
         """
         Update rule for D and R matrices using Hypersurface Cost NMF algorithm.
 
@@ -561,12 +565,9 @@ class HSCostNMF(BasicNMF):
         - epsilon (float, optional): Small constant added to denominator to prevent division by zero. Default is 1e-7.
         - threshold (float, optional): Convergence threshold based on L2,1-norm. Default is 1e-8.
         """
-        threshold = kwargs.get('threshold', 1e-8)
         if not hasattr(self, 'alpha'):
-            self.alpha = np.full_like(self.D, kwargs.get('alpha', 0.1))
-            self.beta = np.full_like(self.R, kwargs.get('beta', 0.1))
-        c = kwargs.get('c', 1e-4)
-        tau = kwargs.get('tau', 0.5)
+            self.alpha = np.full_like(self.D, alpha)
+            self.beta = np.full_like(self.R, beta)
         # Vectorized Armijo rule to update alpha and beta
         self.alpha = self.vectorized_armijo_rule(lambda D: self.obj_func(X, D, self.R), lambda D: self.grad_D(X, D, self.R), self.D, self.alpha, c, tau)
         self.beta = self.vectorized_armijo_rule(lambda R: self.obj_func(X, self.D, R), lambda R: self.grad_R(X, self.D, R), self.R, self.beta, c, tau)
