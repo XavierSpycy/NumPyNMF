@@ -1,7 +1,8 @@
-from typing import Union
+import os
+import csv
+from typing import Union, List
 
 import numpy as np
-import pandas as pd
 
 from algorithm.datasets import load_data, get_image_size
 from algorithm.preprocess import NoiseAdder, MinMaxScaler, StandardScaler
@@ -143,68 +144,51 @@ class Pipeline(BasicBlock):
         if hasattr(self, 'nmf'):
             del self.nmf, self.__X_hat_scaled, self.__X_noise_scaled, self.D, self.R, self.metrics
 
-class Experiment(BasicBlock):
-    def __init__(self, seeds=[0, 42, 99, 512, 3407]):
-        self.seeds = seeds
 
-    def one_type_one_level(self, nmf, dataset, reduce, noise_type, noise_level, scaler_='MinMax', max_iter=500, summary_only=True):
-        df = pd.DataFrame(columns=['dataset', 'noise type', 'noise level', 'seed', 'rmse', 'acc', 'nmi'])
-        for seed in self.seeds:
-            pipeline = Pipeline(nmf, dataset, reduce, noise_type, noise_level, seed, scaler_)
-            rmse, acc, nmi = pipeline.execute(max_iter=max_iter)
-            pipeline.cleanup()
-            del pipeline
-            result = pd.DataFrame({'dataset': dataset, 'noise type': noise_type, 'noise level': noise_level, 
-                                   'seed': seed, 'rmse': rmse, 'acc': acc, 'nmi': nmi}, index=[0])
-            df = pd.concat([df, result], ignore_index=True)
-        avg = pd.DataFrame({'dataset': dataset, 'noise type': noise_type, 'noise level': noise_level,
-                            'seed': 'avg', 'rmse': df.rmse.mean(), 'acc': df.acc.mean(), 'nmi': df.nmi.mean()}, index=[0])
-        std = pd.DataFrame({'dataset': dataset, 'noise type': noise_type, 'noise level': noise_level,
-                            'seed': 'std', 'rmse': df.rmse.std(), 'acc': df.acc.std(), 'nmi': df.nmi.std()}, index=[0])
-        if summary_only:
-            df = pd.concat([avg, std], ignore_index=True)
+def task_params_generator():
+            noises = {
+                'uniform': [0.1, 0.3],
+                'gaussian': [0.05, 0.08],
+                'laplacian': [0.04, 0.06],
+                'salt_and_pepper': [0.02, 0.1],
+                'block': [10, 15]
+                }
+            for noise_type in noises:
+                for noise_level in noises[noise_type]:
+                    yield noise_type, noise_level
+
+class Experiment:
+    def __init__(self, 
+                 nmf: Union[str, BasicNMF],
+                 seeds: List[int]=None):
+        self.nmf = nmf
+        self.seeds = [0, 42, 99, 512, 3407] if seeds is None else seeds
+
+    def task(self, noise_type, noise_level):
+            results = []
+            for seed in self.seeds:
+                for dataset in ['ORL', 'YaleB']:
+                    reduce = 1 if dataset == 'ORL' else 3
+                    pipeline = Pipeline(self.nmf, dataset, reduce=reduce, noise_type=noise_type, noise_level=noise_level, random_state=seed, scaler='MinMax')
+                    metrics = pipeline.execute(max_iter=500, convergence_trend=False, matrix_size=False, verbose=False)
+                    results.append([dataset, self.nmf, noise_type, noise_level, seed, metrics])
+            return results
+    
+    def execute(self):
+        import multiprocessing
+        results = []
+        with multiprocessing.Pool(10) as pool:
+            for result in pool.starmap(self.task, task_params_generator()):
+                results.extend(result)
+
+        if not os.path.exists('log.csv'):
+            mode = 'w'
         else:
-            df = pd.concat([df, avg, std], ignore_index=True)
-        df[['rmse', 'acc', 'nmi']] = df[['rmse', 'acc', 'nmi']].round(4)
-        return df
-    
-    def one_type_multi_levels(self, nmf, dataset, reduce, noise_type, scaler_='MinMax', max_iter=500, summary_only=True):
-        df = pd.DataFrame(columns=['dataset', 'noise type', 'noise level', 'seed', 'rmse', 'acc', 'nmi'])
-        if noise_type == 'uniform':
-            noise_levels = [0.1, 0.3]
-        elif noise_type == 'gaussian':
-            noise_levels = [0.05, 0.08]
-        elif noise_type == 'laplacian':
-            noise_levels = [0.04, 0.06]
-        elif noise_type == 'salt_and_pepper':
-            noise_levels = [0.02, 0.10]
-        elif noise_type == 'block':
-            noise_levels = [10, 15]
-        for noise_level in noise_levels:
-            print(f'Running with {noise_level} level...')
-            result = self.one_type_one_level(nmf, dataset, reduce, noise_type, noise_level, scaler_, max_iter, summary_only)
-            df = pd.concat([df, result], ignore_index=True)
-        return df
-    
-    def multi_types_multi_levels(self, nmf, dataset, reduce, scaler_='MinMax', max_iter=500, summary_only=True):
-        df = pd.DataFrame(columns=['dataset', 'noise type', 'noise level', 'seed', 'rmse', 'acc', 'nmi'])
-        noise_types = ['uniform', 'gaussian', 'laplacian', 'salt_and_pepper', 'block']
-        for noise_type in noise_types:
-            print(f'{noise_type} noise:')
-            result = self.one_type_multi_levels(nmf, dataset, reduce, noise_type, scaler_, max_iter, summary_only)
-            df = pd.concat([df, result], ignore_index=True)
-        return df
-    
-    def multi_datasets(self, nmf, scaler_='MinMax', max_iter=500, summary_only=True):
-        df = pd.DataFrame(columns=['dataset', 'noise type', 'noise level', 'seed', 'rmse', 'acc', 'nmi'])
-        datasets = ['ORL', 'YaleB']
-        for dataset in datasets:
-            print(f'{dataset} dataset:')
-            if dataset == 'ORL':
-                reduce = 1
-            elif dataset == 'YaleB':
-                reduce = 3
-            result = self.multi_types_multi_levels(nmf, dataset, reduce, scaler_, max_iter, summary_only)
-            df = pd.concat([df, result], ignore_index=True)
-        print('Done!')
-        return df
+            mode = 'a'
+        with open('log.csv', mode) as f:
+            writer = csv.writer(f)
+            if mode == 'w': 
+                writer.writerow(['dataset', 'nmf', 'noise_type', 'noise_level', 'seed', 'rmse', 'acc', 'nmi'])
+            for result in results:
+                dataset, nmf, noise_type, noise_level, seed, metrics = result
+                writer.writerow([dataset, nmf, noise_type, noise_level, seed] + list(metrics))
