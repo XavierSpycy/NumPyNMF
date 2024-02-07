@@ -109,10 +109,14 @@ pipeline = Pipeline(nmf=ExampleNMF(),
 from algorithm.pipeline import Experiment
 
 exp = Experiment()
+# Once you build the data container
+# You can choose an NMF algorithm and execute the experiment
+exp.choose('L1NormRegularizedNMF')
 # This step is very time-consuming, please be patient.
 # If you achieve a better performance, congratulations! 
 # You can share your results with us.
-exp.multi_datasets('L1NormRegularizedNMF')
+# Similarly, you can replace 'L1NormRegularizedNMF' with other your customized NMF algorithm
+exp.execute()
 ```
 注意: 这个 `Experiment` 函数接受表示内置算法的一个字符串或者一个 `BasicNMF` 对象，帮助您直接评价您自定义的NMF算法。
 
@@ -1028,6 +1032,10 @@ where $I(\cdot,\cdot$) is the mutual information,$H(\cdot)$ is the entropy.
         - 发布用户交互脚本
         - 引入高阶技巧
         - 分步流式化过程
+- 2024-02-07
+    - 更新日志:
+        - 构建利用多进程技术的实验, 导致显著加速
+        - 新增实验中的日志记录
 
 ## 9. :handshake: 贡献
 我们欢迎任何形式的贡献，无论是提出新功能的建议，报告bug，还是帮助优化代码。以下是开始的步骤：
