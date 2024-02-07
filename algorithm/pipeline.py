@@ -1,5 +1,6 @@
 import os
 import csv
+import logging
 from typing import Union, List
 
 import numpy as np
@@ -9,6 +10,8 @@ from algorithm.preprocess import NoiseAdder, MinMaxScaler, StandardScaler
 from algorithm.sample import random_sample
 from algorithm.nmf import BasicNMF, L2NormNMF, KLDivergenceNMF, ISDivergenceNMF, L21NormNMF, HSCostNMF, L1NormRegularizedNMF, CappedNormNMF, CauchyNMF
 from algorithm.user_evaluate import evaluate
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class BasicBlock(object):
     def basic_info(self, nmf, dataset, scaler):
@@ -158,37 +161,91 @@ def task_params_generator():
                     yield noise_type, noise_level
 
 class Experiment:
+    data_dirs = ['data/ORL', 'data/CroppedYaleB']
+    data_container = [[], []]
+    data_loader = []
+    noises = {
+        'uniform': [0.1, 0.3],
+        'gaussian': [0.05, 0.08],
+        'laplacian': [0.04, 0.06],
+        'salt_and_pepper': [0.02, 0.1],
+        'block': [10, 15],}
+    
+    nmf_dict = {
+        'L2NormNMF': L2NormNMF,
+        'KLDivergenceNMF': KLDivergenceNMF,
+        'ISDivergenceNMF': ISDivergenceNMF,
+        'L21NormNMF': L21NormNMF,
+        'HSCostNMF': HSCostNMF,
+        'L1NormRegularizedNMF': L1NormRegularizedNMF,
+        'CappedNormNMF': CappedNormNMF,
+        'CauchyNMF': CauchyNMF,}
+    
     def __init__(self, 
-                 nmf: Union[str, BasicNMF],
                  seeds: List[int]=None):
-        self.nmf = nmf
         self.seeds = [0, 42, 99, 512, 3407] if seeds is None else seeds
 
-    def task(self, noise_type, noise_level):
-            results = []
+    def choose(self, nmf: Union[str, BasicNMF]):
+        if isinstance(nmf, BasicNMF):
+            self.nmf = nmf
+        else:
+             # Choose an NMF algorithm
+            self.nmf = self.nmf_dict.get(nmf, L1NormRegularizedNMF)()
+
+    def build_data_container(self):
+        scaler = MinMaxScaler()
+        for data_file in self.data_dirs:
+            reduce = 1 if data_file.endswith('ORL') else 3
+            image_size = get_image_size(data_file)
+            X_hat_, Y_hat_ = load_data(root=data_file, reduce=reduce)
             for seed in self.seeds:
-                for dataset in ['ORL', 'YaleB']:
-                    reduce = 1 if dataset == 'ORL' else 3
-                    pipeline = Pipeline(self.nmf, dataset, reduce=reduce, noise_type=noise_type, noise_level=noise_level, random_state=seed, scaler='MinMax')
-                    metrics = pipeline.execute(max_iter=500, convergence_trend=False, matrix_size=False, verbose=False)
-                    results.append([dataset, self.nmf, noise_type, noise_level, seed, metrics])
-            return results
+                noise_adder = NoiseAdder(random_state=seed)
+                X_hat, Y_hat = random_sample(X_hat_, Y_hat_, 0.9, random_state=seed)
+                X_hat_scaled = scaler.fit_transform(X_hat)
+                self.data_container[0].append([])
+                self.data_container[1].append((X_hat_scaled, Y_hat))
+                for noise_type in self.noises:
+                    add_noise_ = getattr(noise_adder, f'add_{noise_type}_noise')
+                    for noise_level in self.noises[noise_type]:
+                        _, X_noise = add_noise_(X_hat, noise_level=noise_level) if noise_type != 'block' else add_noise_(X_hat, image_size[0]//reduce, noise_level)
+                        X_noise_scaled = scaler.transform(X_noise)
+                        X_noise_scaled += np.abs(np.min(X_noise_scaled)) * np.abs(np.min(X_noise_scaled)) * int(np.min(X_noise_scaled) < 0)
+                        self.data_container[0][-1].append((X_noise_scaled, noise_type, noise_level))
+        
+        logging.info('Data container has been built successfully.')
+
+    def build_data_generator(self):
+        if len(self.data_container[0]) == 0:
+            self.build_data_container()
+        
+        for i in range(len(self.data_container[1])):
+            dataset = 'ORL' if i <=4 else 'YaleB'
+            X_hat_scaled, Y_hat = self.data_container[1][i]
+            seed = self.seeds[i%len(self.seeds)]
+            for j in range(len(self.data_container[0][i])):
+                X_noise_scaled, noise_type, noise_level = self.data_container[0][i][j]
+                yield dataset, seed, X_hat_scaled, Y_hat, X_noise_scaled, noise_type, noise_level
+    
+    def multiple(self, dataset, seed, X_hat_scaled, Y_hat, X_noise_scaled, noise_type, noise_level):
+        self.nmf.fit(X_noise_scaled, len(set(Y_hat)), random_state=seed, verbose=False)
+        logging.info(f'Random seed: {seed} - Test on {noise_type} with {noise_level} ended.')
+        return dataset, noise_type, noise_level, seed, *self.nmf.evaluate(X_hat_scaled, Y_hat, random_state=seed)
     
     def execute(self):
         import multiprocessing
         results = []
-        with multiprocessing.Pool(10) as pool:
-            for result in pool.starmap(self.task, task_params_generator()):
-                results.extend(result)
 
-        if not os.path.exists('log.csv'):
+        with multiprocessing.Pool(10) as pool:
+            for result in pool.starmap(self.multiple, self.build_data_generator()):
+                results.append(result)
+
+        if not os.path.exists(f'{self.nmf.name}_log.csv'):
             mode = 'w'
         else:
             mode = 'a'
-        with open('log.csv', mode) as f:
+        with open(f'{self.nmf.name}_log.csv', mode) as f:
             writer = csv.writer(f)
             if mode == 'w': 
-                writer.writerow(['dataset', 'nmf', 'noise_type', 'noise_level', 'seed', 'rmse', 'acc', 'nmi'])
+                writer.writerow(['dataset', 'noise_type', 'noise_level', 'seed', 'rmse', 'acc', 'nmi'])
             for result in results:
-                dataset, nmf, noise_type, noise_level, seed, metrics = result
-                writer.writerow([dataset, nmf, noise_type, noise_level, seed] + list(metrics))
+                writer.writerow(result)
