@@ -106,10 +106,14 @@ For a comprehensive assessment, conduct experiments across our datasets:
 from algorithm.pipeline import Experiment
 
 exp = Experiment()
+# Once you build the data container
+# You can choose an NMF algorithm and execute the experiment
+exp.choose('L1NormRegularizedNMF')
 # This step is very time-consuming, please be patient.
 # If you achieve a better performance, congratulations! 
 # You can share your results with us.
-exp.multi_datasets('L1NormRegularizedNMF')
+# Similarly, you can replace 'L1NormRegularizedNMF' with other your customized NMF algorithm
+exp.execute()
 ```
 Note: The `Experiment` function accepts either a string representing a built-in algorithm or a `BasicNMF` object, enabling you to directly evaluate your custom NMF algorithm.
 
@@ -1028,6 +1032,10 @@ We warmly welcome you to delve into our source code and contribute to its enhanc
         - Released user interface scripts.
         - Introduced advanced techniques.
         - Streamlined processes in a step-by-step manner
+- 2024-02-07
+    - Update log:
+        - Constructed experiments utilizing multiprocessing techniques, which have resulted in significant acceleration
+        - Added log recordings during experiments
 
 ## 9. :handshake: Contribution
 We welcome contributions of any kind, whether it's suggesting new features, reporting bugs, or helping with code optimizations. Here are the steps to get started:

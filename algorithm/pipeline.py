@@ -163,7 +163,6 @@ def task_params_generator():
 class Experiment:
     data_dirs = ['data/ORL', 'data/CroppedYaleB']
     data_container = [[], []]
-    data_loader = []
     noises = {
         'uniform': [0.1, 0.3],
         'gaussian': [0.05, 0.08],
@@ -192,7 +191,7 @@ class Experiment:
              # Choose an NMF algorithm
             self.nmf = self.nmf_dict.get(nmf, L1NormRegularizedNMF)()
 
-    def build_data_container(self):
+    def data_loader(self):
         scaler = MinMaxScaler()
         for data_file in self.data_dirs:
             reduce = 1 if data_file.endswith('ORL') else 3
@@ -202,33 +201,17 @@ class Experiment:
                 noise_adder = NoiseAdder(random_state=seed)
                 X_hat, Y_hat = random_sample(X_hat_, Y_hat_, 0.9, random_state=seed)
                 X_hat_scaled = scaler.fit_transform(X_hat)
-                self.data_container[0].append([])
-                self.data_container[1].append((X_hat_scaled, Y_hat))
                 for noise_type in self.noises:
                     add_noise_ = getattr(noise_adder, f'add_{noise_type}_noise')
                     for noise_level in self.noises[noise_type]:
                         _, X_noise = add_noise_(X_hat, noise_level=noise_level) if noise_type != 'block' else add_noise_(X_hat, image_size[0]//reduce, noise_level)
                         X_noise_scaled = scaler.transform(X_noise)
                         X_noise_scaled += np.abs(np.min(X_noise_scaled)) * np.abs(np.min(X_noise_scaled)) * int(np.min(X_noise_scaled) < 0)
-                        self.data_container[0][-1].append((X_noise_scaled, noise_type, noise_level))
-        
-        logging.info('Data container has been built successfully.')
-
-    def build_data_generator(self):
-        if len(self.data_container[0]) == 0:
-            self.build_data_container()
-        
-        for i in range(len(self.data_container[1])):
-            dataset = 'ORL' if i <=4 else 'YaleB'
-            X_hat_scaled, Y_hat = self.data_container[1][i]
-            seed = self.seeds[i%len(self.seeds)]
-            for j in range(len(self.data_container[0][i])):
-                X_noise_scaled, noise_type, noise_level = self.data_container[0][i][j]
-                yield dataset, seed, X_hat_scaled, Y_hat, X_noise_scaled, noise_type, noise_level
+                        yield data_file.split("/")[-1], seed, X_hat_scaled, Y_hat, X_noise_scaled, noise_type, noise_level
     
-    def multiple(self, dataset, seed, X_hat_scaled, Y_hat, X_noise_scaled, noise_type, noise_level):
+    def sync_fit(self, dataset, seed, X_hat_scaled, Y_hat, X_noise_scaled, noise_type, noise_level):
         self.nmf.fit(X_noise_scaled, len(set(Y_hat)), random_state=seed, verbose=False)
-        logging.info(f'Random seed: {seed} - Test on {noise_type} with {noise_level} ended.')
+        logging.info(f'Dataset: {dataset} Random seed: {seed} - Test on {noise_type} with {noise_level} ended.')
         return dataset, noise_type, noise_level, seed, *self.nmf.evaluate(X_hat_scaled, Y_hat, random_state=seed)
     
     def execute(self):
@@ -236,7 +219,7 @@ class Experiment:
         results = []
 
         with multiprocessing.Pool(10) as pool:
-            for result in pool.starmap(self.multiple, self.build_data_generator()):
+            for result in pool.starmap(self.sync_fit, self.data_loader()):
                 results.append(result)
 
         if not os.path.exists(f'{self.nmf.name}_log.csv'):
