@@ -74,6 +74,7 @@ with gr.Blocks() as demo:
         with gr.Group():
             with gr.Row():
                 nmf = gr.Dropdown(
+                    label="NMF Algorithm",
                     choices=['L1NormRegularizedNMF', 'L2NormNMF', 'KLDivergenceNMF', 
                             'ISDivergenceNMF', 'L21NormNMF', 'HSCostNMF', 
                             'CappedNormNMF', 'CauchyNMF'],
@@ -81,6 +82,7 @@ with gr.Blocks() as demo:
                     info="Choose the NMF algorithm.")
                 
                 dataset = gr.Dropdown(
+                    label="Dataset",
                     choices=['ORL', 'YaleB'],
                     value='YaleB',
                     info="Choose the dataset.")
@@ -92,6 +94,7 @@ with gr.Blocks() as demo:
                 
             with gr.Row():
                 noise_type = gr.Dropdown(
+                    label="Noise Type",
                     choices=['Uniform', 'Gaussian', 'Laplacian', 'Salt & Pepper', 'Block'],
                     value='Salt & Pepper',
                     info="Choose the noise type.")
@@ -110,6 +113,7 @@ with gr.Blocks() as demo:
                     info="Choose the random state.",)
                 
                 scaler = gr.Dropdown(
+                    label="Scaler",
                     choices=['MinMax', 'Standard'],
                     value='MinMax',
                     info="Choose the scaler.")
