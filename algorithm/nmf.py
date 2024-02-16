@@ -3,7 +3,7 @@ import time
 import pickle
 from abc import ABC, abstractmethod
 from collections import Counter
-from typing import Union, Dict, Tuple
+from typing import Union, Dict, Tuple, Generator
 
 import numpy as np
 from tqdm import tqdm
@@ -86,7 +86,7 @@ class BasicNMF(ABC):
         S = np.dot(W, X)
         return S
     
-    def __NICA(self, X: np.ndarray, r: int, random_state: Union[int, np.random.RandomState, None]=None) -> (np.ndarray, np.ndarray):
+    def __NICA(self, X: np.ndarray, r: int, random_state: Union[int, np.random.RandomState, None]=None) -> Tuple[np.ndarray, np.ndarray]:
         """
         Implementation of a non-negative Independent Component Analysis (NICA). 
         The process involves obtaining a non-negative basic matrix and a 
@@ -165,7 +165,7 @@ class BasicNMF(ABC):
         
     def fit(self, X: np.ndarray, n_components: int, max_iter: int=500, 
             random_state: Union[int, np.random.RandomState, None]=None, 
-            verbose: bool=True, imshow: bool=False, **kwargs) -> None:
+            verbose: bool=True, imshow: bool=False, warm_start: bool=False, **kwargs) -> None:
         """
         Non-negative Matrix Factorization (NMF) algorithm using L2-norm for convergence criterion.
         
@@ -176,11 +176,18 @@ class BasicNMF(ABC):
         - verbose (bool, optional): Whether to show the progress bar.
         - random_state (int, np.random.RandomState, None, optional): Random state for reproducibility. Default is None.
         - imshow (bool, optional): Whether to plot convergence trend. Default is False.
+        - warm_start (bool, optional): Whether to continue from the previous state. Default is False.
+        - kwargs: Additional keyword arguments for the update rule.
         """
         # Record start time
         start_time = time.time()
-        # Initialize D and R matrices using NICA algorithm
-        self.D, self.R = self.matrix_init(X, n_components, random_state)
+        # Initialize D and R matrices using NICA algorithm by default
+        if not warm_start or (warm_start and not hasattr(self, 'D') and not hasattr(self, 'R')):
+            self.D, self.R = self.matrix_init(X, n_components, random_state)
+        else:
+            if verbose:
+                print('Warm start enabled. Continuing from previous state.')
+
         # Compute initialization time
         init_time = time.time() - start_time
         # Copy D and R matrices for convergence check
@@ -213,7 +220,7 @@ class BasicNMF(ABC):
         plt.grid()
         plt.show()
     
-    def conditional_tqdm(self, iterable, verbose: bool=True) -> int:
+    def conditional_tqdm(self, iterable, verbose: bool=True) -> Generator[int, None, None]:
         """
         Determine whether to use tqdm or not based on the verbose flag.
 
