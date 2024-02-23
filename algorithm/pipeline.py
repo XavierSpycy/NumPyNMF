@@ -4,6 +4,7 @@ import logging
 from typing import Union, List
 
 import numpy as np
+import pandas as pd
 
 from algorithm.datasets import load_data, get_image_size
 from algorithm.preprocess import NoiseAdder, MinMaxScaler, StandardScaler
@@ -12,6 +13,11 @@ from algorithm.nmf import BasicNMF, L2NormNMF, KLDivergenceNMF, ISDivergenceNMF,
 from algorithm.user_evaluate import evaluate
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+def summary(log_file_name: str) -> pd.DataFrame:
+    df = pd.read_csv(log_file_name)
+    result = df.groupby(by=['dataset', 'noise_type', 'noise_level'])[['rmse', 'nmi', 'acc']].mean()
+    return result
 
 class BasicBlock(object):
     def basic_info(self, nmf, dataset, scaler):
