@@ -1,7 +1,6 @@
-from typing import Union
+from typing import Union, Tuple
 
 import numpy as np
-
 
 class MinMaxScaler:
     """
@@ -106,7 +105,7 @@ class NoiseAdder:
         """
         self.rng = np.random.RandomState(random_state)
     
-    def add_uniform_noise(self, X_hat: np.ndarray, noise_level: int=0.1) -> (np.ndarray, np.ndarray):
+    def add_uniform_noise(self, X_hat: np.ndarray, noise_level: int=0.1) -> Tuple[np.ndarray, np.ndarray]:
         """
         Add uniform random noise to data.
 
@@ -159,7 +158,7 @@ class NoiseAdder:
         X_noise = self.rng.laplace(mu, lambd, size=X_hat.shape) * noise_level * np.max(X_hat)
         return X_noise, X_hat + X_noise
 
-    def add_block_noise(self, X_hat: np.ndarray, img_width: int, block_size: int=10) -> (np.ndarray, np.ndarray):
+    def add_block_noise(self, X_hat: np.ndarray, img_width: int, block_size: int=10) -> Tuple[np.ndarray, np.ndarray]:
         """
         Add block noise to multiple flattened image samples.
 
@@ -197,7 +196,7 @@ class NoiseAdder:
             X[:, i] = img_2d.ravel()
         return X_noise, X
     
-    def add_salt_and_pepper_noise(self, X_hat, noise_level=0.02, salt_ratio=0.5) -> (np.ndarray, np.ndarray):
+    def add_salt_and_pepper_noise(self, X_hat, noise_level=0.02, salt_ratio=0.5) -> Tuple[np.ndarray, np.ndarray]:
         """
         Add "salt and pepper" noise to data.
 

@@ -8,7 +8,8 @@ from algorithm.visualize import origin_versus_dictrep
 def evaluate(nmf: BasicNMF, metrics: Tuple, X: np.ndarray, X_noise: np.ndarray, 
              image_size: tuple, reduce: int, idx=2, imshow: bool=False) -> None:
     
-    """Evaluate the performance of NMF algorithms.
+    """
+    Evaluate the performance of NMF algorithms.
     
     Parameters
     - nmf (BasicNMF): The NMF algorithm.

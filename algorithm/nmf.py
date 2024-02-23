@@ -14,7 +14,6 @@ from sklearn.metrics import mean_squared_error,  accuracy_score, normalized_mutu
 
 class BasicNMF(ABC):
     name = 'Basic'
-
     """
     A basic framework for Non-negative Matrix Factorization (NMF) algorithms.
     """
@@ -241,13 +240,29 @@ class BasicNMF(ABC):
     def normalize(self, epsilon: float=1e-7):
         """
         Normalize columns of D and rows of R.
+
+        Parameter:
+        - epsilon (float, optional): Small constant added to denominator to prevent division by zero. Default is 1e-7.
         """
         # Normalize columns of D and rows of R
         norms = np.sqrt(np.sum(self.D**2, axis=0))
         self.D /= norms[np.newaxis, :] + epsilon
         self.R *= norms[:, np.newaxis]
     
-    def evaluate(self, X_clean, Y_true, random_state=None):
+    def evaluate(self, X_clean: np.ndarray, Y_true: np.ndarray, random_state: Union[int, np.random.RandomState, None]=None) -> Tuple[float, float, float]:
+        """
+        Evaluate the specific NMF algorithm on the specific dataset.
+
+        Parameters:
+        - X_clean ()
+        - Y_true ()
+        - random_state ()
+
+        Returns:
+        - rmse: 
+        - acc
+        - nmi
+        """
         Y_label = self.__labeling(self.R.T, Y_true, random_state=random_state)
         rmse = np.sqrt(mean_squared_error(X_clean, np.dot(self.D, self.R)))
         acc = accuracy_score(Y_true, Y_label)
@@ -389,11 +404,25 @@ class KLDivergenceNMF(BasicNMF):
 
 class ISDivergenceNMF(BasicNMF):
     name = 'ISDivergence'
+    """
+    IS-divergence NMF algorithm.
+    """
     def __init__(self) -> None:
+        """
+        Initialize the IS-divergence NMF algorithm.
+        """
         super().__init__()
         self.prev_is_div = float('inf')
 
-    def update(self, X, lambd=1e+2, epsilon=1e-7, threshold=1e-6):
+    def update(self, X: np.ndarray, epsilon: float=1e-7, threshold: float=1e-6) -> None:
+        """
+        Update rule for D and R matrices using IS-divergence NMF algorithm.
+
+        Parameters:
+        - X (numpy.ndarray): Input data matrix of shape (n_features, n_samples).
+        - epsilon (float, optional): Small constant added to denominator to prevent division by zero. Default is 1e-7.
+        - threshold (float, optional): Convergence threshold based on IS-divergence. Default is 1e-6.
+        """
         # Update R
         DR = np.dot(self.D, self.R)
         DR = np.where(DR > 0, DR, epsilon)
@@ -415,11 +444,25 @@ class ISDivergenceNMF(BasicNMF):
         return flag
 
 class L21NormNMF(BasicNMF):
-    name = 'L1Norm'
+    name = 'L21Norm'
+    """
+    L21 Norm NMF algorithm.
+    """
     def __init__(self) -> None:
+        """
+        Initialize the L21 Norm NMF algorithm.
+        """
         super().__init__()
     
-    def update(self, X, epsilon=1e-7, threshold=1e-4):
+    def update(self, X: np.ndarray, epsilon: float=1e-7, threshold: float=1e-4) -> None:
+        """
+        Update rule for D and R matrices using L21 Norm NMF algorithm.
+
+        Parameters:
+        - X (numpy.ndarray): Input data matrix of shape (n_features, n_samples).
+        - epsilon (float, optional): Small constant added to denominator to prevent division by zero. Default is 1e-7.
+        - threshold (float, optional): Convergence threshold based on L21 Norm. Default is 1e-4.
+        """
         # Multiplicative update rule for D and R matrices
         residual = X - np.dot(self.D, self.R) # residual.shape = (n_features, n_samples)
         norm_values = np.sqrt(np.sum(residual ** 2, axis=1))
@@ -440,10 +483,16 @@ class L21NormNMF(BasicNMF):
         
 class L1NormRegularizedNMF(BasicNMF):
     name = 'L1NormRegularized'
+    """
+    L1 Norm Regularized NMF algorithm.
+    """
     def __init__(self) -> None:
+        """
+        Initialize the L1 Norm Regularized NMF algorithm.
+        """
         super().__init__()
 
-    def soft_thresholding(self, x, lambd):
+    def soft_thresholding(self, x: np.ndarray, lambd: float) -> np.ndarray:
         """
         Soft thresholding operator.
 
@@ -453,11 +502,15 @@ class L1NormRegularizedNMF(BasicNMF):
         """
         return np.where(x > lambd, x - lambd, np.where(x < -lambd, x + lambd, 0))
     
-    def update(self, X, lambd=0.2, threshold=1e-8, epsilon=1e-7):
+    def update(self, X: np.ndarray, lambd: float=0.2, epsilon: float=1e-7, threshold: float=1e-8) -> None:
         """
-        
+        Update rule for D and R matrices using L1 Norm  Regularized NMF algorithm.
+
         Parameters:
-        lambd
+        - X (numpy.ndarray): Input data matrix of shape (n_features, n_samples).
+        - lambd (float): Threshold value.
+        - epsilon (float, optional): Small constant added to denominator to prevent division by zero. Default is 1e-7.
+        - threshold (float, optional): Convergence threshold based on L1 Norm Regularized. Default is 1e-8.
         """
         # Compute the error matrix
         S = X - np.dot(self.D, self.R)
@@ -484,16 +537,38 @@ class L1NormRegularizedNMF(BasicNMF):
         return self.Kmeans(X, n_components, random_state)
 
 class CauchyNMF(BasicNMF):
+    name = 'Cauchy'
+    """
+    Cauchy NMF algorithm.
+    """
     def __init__(self) -> None:
+        """
+        Initialize the Cauchy NMF algorithm.
+        """
         super().__init__()
     
-    def compute(self, A, B, epsilon):
-        """Update rule for Cauchy divergence."""
+    def compute(self, A: np.ndarray, B: np.ndarray, epsilon: float) -> np.ndarray:
+        """
+        Update rule for Cauchy divergence.
+        
+        Parameters:
+        A (numpy.ndarray): The first matrix A.
+        B (numpy.ndarray): The second matrix B.
+        epsilon (float): Small constant added to denominator to prevent division by zero.
+        """
         temp = A ** 2 + 2 * B * A
         temp = np.where(temp > 0, temp, epsilon)
         return B / (A + np.sqrt(temp))
 
-    def update(self, X, epsilon: float=1e-7, threshold=1e-4):
+    def update(self, X: np.ndarray, epsilon: float=1e-7, threshold: float=1e-4) -> None:
+        """
+        Update rule for D and R matrices using Cauchy NMF algorithm.
+
+        Parameters:
+        - X (numpy.ndarray): Input data matrix of shape (n_features, n_samples).
+        - epsilon (float, optional): Small constant added to denominator to prevent division by zero. Default is 1e-7.
+        - threshold (float, optional): Convergence threshold based on Cauchy. Default is 1e-4.
+        """
         if not hasattr(self, 'prev_cauchy_div'):
             DR = np.dot(self.D, self.R)
             log_residual = np.log(DR + epsilon) - np.log(X + epsilon)
@@ -519,7 +594,13 @@ class CauchyNMF(BasicNMF):
 
 class CappedNormNMF(BasicNMF):
     name = 'CappedNorm'
+    """
+    Capped Norm NMF algorithm.
+    """
     def __init__(self) -> None:
+        """
+        Initialize Capped Norm NMF algorithm.
+        """
         super().__init__()
         self.loss_prev = float('inf')
     
@@ -527,7 +608,7 @@ class CappedNormNMF(BasicNMF):
                      random_state: Union[int, np.random.RandomState, None]=None) -> None:
         return self.Kmeans(X, n_components, random_state)
     
-    def update(self, X, theta: float=0.2, threshold: float=1e-3, epsilon: float=1e-7):
+    def update(self, X, theta: float=0.2, threshold: float=1e-3, epsilon: float=1e-7) -> None:
         """
         Update rule for D and R matrices using Capped Norm NMF algorithm.
 
@@ -562,7 +643,13 @@ class CappedNormNMF(BasicNMF):
 
 class HSCostNMF(BasicNMF):
     name = 'HSCost'
+    """
+    Hypersurface Cost NMF algorithm.
+    """
     def __init__(self) -> None:
+        """
+        Initialize Hypersurface Cost NMF algorithm.
+        """
         super().__init__()
         self.loss_prev = float('inf')
         # Objective function and its gradient
@@ -570,7 +657,7 @@ class HSCostNMF(BasicNMF):
         self.grad_D = lambda X, D, R: (np.dot((np.dot(D, R) - X), R.T)) / np.sqrt(1 + np.linalg.norm(X - np.dot(D, R), 'fro'))
         self.grad_R = lambda X, D, R: (np.dot(D.T, (np.dot(D, R) - X))) / np.sqrt(1 + np.linalg.norm(X - np.dot(D, R), 'fro'))
 
-    def update(self, X, threshold: float=1e-8, alpha: float=0.1, beta: float=0.1, c: float=1e-4, tau: float=0.5):
+    def update(self, X: np.ndarray, threshold: float=1e-8, alpha: float=0.1, beta: float=0.1, c: float=1e-4, tau: float=0.5) -> None:
         """
         Update rule for D and R matrices using Hypersurface Cost NMF algorithm.
 
@@ -578,8 +665,8 @@ class HSCostNMF(BasicNMF):
         - X (numpy.ndarray): Input data matrix of shape (n_features, n_samples).
         - alpha (float, optional): Learning rate for gradient descent. Default is 0.1.
         - beta (float, optional): Learning rate for gradient descent. Default is 0.1.
-        - epsilon (float, optional): Small constant added to denominator to prevent division by zero. Default is 1e-7.
-        - threshold (float, optional): Convergence threshold based on L2,1-norm. Default is 1e-8.
+        - c (float, optional):
+        - tau (float, optional): 
         """
         if not hasattr(self, 'alpha'):
             self.alpha = np.full_like(self.D, alpha)

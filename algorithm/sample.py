@@ -1,6 +1,8 @@
+from typing import Union
+
 import numpy as np
 
-def random_sample(X, Y, fraction=0.90, random_state=None):
+def random_sample(X: np.ndarray, Y: np.ndarray, fraction: float=0.90, random_state: Union[int, np.random.RandomState, None]=None) -> np.ndarray:
     """
     Randomly sample a fraction of the data.
 
