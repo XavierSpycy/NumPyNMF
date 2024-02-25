@@ -1,4 +1,5 @@
 import os
+from typing import Tuple
 
 import numpy as np
 from PIL import Image
@@ -27,7 +28,7 @@ def validate_data_directory(root: str) -> None:
             raise FileNotFoundError(f'{os.path.join(root, subdir)} does not contain any image!')
     
 
-def load_data(root: str='data/CroppedYaleB', reduce: int=1, global_centering: bool=True, local_centering: bool=True) -> (np.ndarray, np.ndarray): 
+def load_data(root: str='data/CroppedYaleB', reduce: int=1, global_centering: bool=True, local_centering: bool=True) -> Tuple[np.ndarray, np.ndarray]: 
     """
     Load ORL (or Extended YaleB) dataset into a numpy array.
     
