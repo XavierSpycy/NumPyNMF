@@ -21,6 +21,9 @@
 ```bash
 $ python app.py
 ```
+或者, 探索我们托管在Hugging Face上的空间:
+
+<a href="https://huggingface.co/spaces/XavierSpycy/NumPyNMF-Showcase">🤗 Space</a>
 
 通过几个简单的步骤直接与我们的算法互动：
 - 步骤1. 在左侧选择您希望的参数；

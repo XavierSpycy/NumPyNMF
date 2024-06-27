@@ -21,6 +21,9 @@ Dive into the heart of our technology with a hands-on demonstration. Simply init
 ```bash
 $ python app.py
 ```
+Alternatively, explore our space hosted on the Hugging Face platform:
+
+<a href="https://huggingface.co/spaces/XavierSpycy/NumPyNMF-Showcase">🤗 Space</a>
 
 Engage directly with our algorithm in a few easy steps: 
 - Step 1. Select your desired parameters on the left side; 
