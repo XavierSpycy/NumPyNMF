@@ -1,4 +1,5 @@
 import os
+import re
 import csv
 import logging
 from typing import Union, List, Tuple, Generator
@@ -6,11 +7,28 @@ from typing import Union, List, Tuple, Generator
 import numpy as np
 import pandas as pd
 
-from algorithm.datasets import load_data, get_image_size
-from algorithm.preprocess import NoiseAdder, MinMaxScaler, StandardScaler
-from algorithm.sample import random_sample
-from algorithm.nmf import BasicNMF, L2NormNMF, KLDivergenceNMF, ISDivergenceNMF, L21NormNMF, HSCostNMF, L1NormRegularizedNMF, CappedNormNMF, CauchyNMF
-from algorithm.user_evaluate import evaluate
+from .datasets import (
+    load_data, 
+    get_image_size,
+)
+from .preprocess import (
+    NoiseAdder, 
+    MinMaxScaler, 
+    StandardScaler,
+)
+from .sample import random_sample
+from .nmf import (
+    BasicNMF, 
+    L2NormNMF, 
+    KLDivergenceNMF, 
+    ISDivergenceNMF, 
+    L21NormNMF, 
+    HSCostNMF, 
+    L1NormRegularizedNMF, 
+    CappedNormNMF, 
+    CauchyNMF,
+)
+from .user_evaluate import evaluate
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -22,6 +40,7 @@ def summary(log_file_name: str) -> pd.DataFrame:
     Return:
     result (pandas.DataFrame): The summary of the log file.
     """
+    
     df = pd.read_csv(log_file_name)
     result = df.groupby(by=['dataset', 'noise_type', 'noise_level'])[['rmse', 'nmi', 'acc']].mean()
     return result
@@ -341,7 +360,7 @@ class Experiment:
         - acc (float): Accuracy of the NMF algorithm.
         - nmi (float): Normalized mutual information of the NMF algorithm.
         """
-        self.nmf.fit(X_noise_scaled, len(set(Y_hat)), random_state=seed, verbose=False)
+        self.nmf.fit(X_noise_scaled, len(set(Y_hat)), random_state=seed, max_iter=200, verbose=False)
         # Display the current experiment information
         logging.info(f'Dataset: {dataset} Random seed: {seed} - Test on {noise_type} with {noise_level} ended.')
         return dataset, noise_type, noise_level, seed, *self.nmf.evaluate(X_hat_scaled, Y_hat, random_state=seed)
@@ -350,22 +369,35 @@ class Experiment:
         """
         Execute the experiments.
         """
+
+        tag = re.sub('([a-z0-9])([A-Z])', r'\1_\2', re.sub('(.)([A-Z][a-z]+)', r'\1_\2', self.nmf.__class__.__name__)).lower()
+        
         # Lazy import to avoid multiprocessing error
-        import multiprocessing
+        from multiprocessing import Pool
         results = []
         # Define the multiprocessing pool
-        with multiprocessing.Pool(10) as pool:
+        with Pool(10) as pool:
             for result in pool.starmap(self.sync_fit, self.data_loader()):
                 # Append the result to the list
                 results.append(result)
         # Write the results to a csv file
-        if not os.path.exists(f'{self.nmf.name}_log.csv'):
+        if not os.path.exists(f'{tag}_log.csv'):
             mode = 'w'
         else:
             mode = 'a'
-        with open(f'{self.nmf.name}_log.csv', mode) as f:
+        with open(f'{tag}_log.csv', mode) as f:
             writer = csv.writer(f)
             if mode == 'w': 
                 writer.writerow(['dataset', 'noise_type', 'noise_level', 'seed', 'rmse', 'acc', 'nmi'])
             for result in results:
                 writer.writerow(result)
+    
+    def summary(self) -> pd.DataFrame:
+        """
+        Summarize the results of the experiments.
+
+        Returns:
+        - result (pandas.DataFrame): The summary of the results.
+        """
+        tag = re.sub('([a-z0-9])([A-Z])', r'\1_\2', re.sub('(.)([A-Z][a-z]+)', r'\1_\2', self.nmf.__class__.__name__)).lower()
+        return summary(f'{tag}_log.csv')

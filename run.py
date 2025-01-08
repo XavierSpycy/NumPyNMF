@@ -1,5 +1,5 @@
 import argparse
-from algorithm.pipeline import Pipeline
+from algorithm import Pipeline
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--nmf', 

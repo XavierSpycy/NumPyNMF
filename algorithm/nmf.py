@@ -12,7 +12,7 @@ from sklearn.cluster import KMeans, BisectingKMeans
 from sklearn.metrics import mean_squared_error,  accuracy_score, normalized_mutual_info_score
 
 class BasicNMF(ABC):
-    name = 'Basic'
+    
     """
     A basic framework for Non-negative Matrix Factorization (NMF) algorithms.
     """
@@ -372,7 +372,7 @@ class BasicNMF(ABC):
         self.fit(**kwargs)
     
 class L2NormNMF(BasicNMF):
-    name = 'L2Norm'
+    
     """
     L2-norm NMF algorithm.
     """
@@ -405,7 +405,7 @@ class L2NormNMF(BasicNMF):
         return (e_D < threshold and e_R < threshold)
 
 class KLDivergenceNMF(BasicNMF):
-    name = 'KLDivergence'
+    
     """
     KL-divergence NMF algorithm.
     """
@@ -441,7 +441,7 @@ class KLDivergenceNMF(BasicNMF):
         return flag
 
 class ISDivergenceNMF(BasicNMF):
-    name = 'ISDivergence'
+    
     """
     IS-divergence NMF algorithm.
     """
@@ -485,7 +485,7 @@ class ISDivergenceNMF(BasicNMF):
         return flag
 
 class L21NormNMF(BasicNMF):
-    name = 'L21Norm'
+    
     """
     L21 Norm NMF algorithm.
     """
@@ -526,7 +526,7 @@ class L21NormNMF(BasicNMF):
         return (e_D < threshold and e_R < threshold)
         
 class L1NormRegularizedNMF(BasicNMF):
-    name = 'L1NormRegularized'
+    
     """
     L1 Norm Regularized NMF algorithm.
     """
@@ -588,7 +588,7 @@ class L1NormRegularizedNMF(BasicNMF):
         return self.Kmeans(X, n_components, random_state)
 
 class CauchyNMF(BasicNMF):
-    name = 'Cauchy'
+    
     """
     Cauchy NMF algorithm.
     """
@@ -651,7 +651,7 @@ class CauchyNMF(BasicNMF):
         return flag
 
 class CappedNormNMF(BasicNMF):
-    name = 'CappedNorm'
+    
     """
     Capped Norm NMF algorithm.
     """
@@ -701,7 +701,7 @@ class CappedNormNMF(BasicNMF):
         return flag
 
 class HSCostNMF(BasicNMF):
-    name = 'HSCost'
+    
     """
     Hypersurface Cost NMF algorithm.
     """

@@ -2,8 +2,8 @@ from typing import Tuple
 
 import numpy as np
 
-from algorithm.nmf import BasicNMF
-from algorithm.visualize import origin_versus_dictrep
+from .nmf import BasicNMF
+from .visualize import origin_versus_dictrep
 
 def evaluate(nmf: BasicNMF, metrics: Tuple, X: np.ndarray, X_noise: np.ndarray, 
              image_size: tuple, reduce: int, idx=2, imshow: bool=False) -> None:
